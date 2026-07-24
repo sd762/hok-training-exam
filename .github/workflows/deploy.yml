@@ -27,7 +27,14 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # 這兩個值設計上就會出現在打包結果中（前端直連 Supabase），
+      # 安全性由資料庫的 RLS 政策保障，因此存為 variables 而非 secrets。
+      # 可繞過 RLS 的 secret key 絕不放在這裡。
       - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
