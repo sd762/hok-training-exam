@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+/*
+ * 清福長照集團教育訓練測考系統 — 色彩系統
+ *
+ * 品牌色與狀態色刻意分離（見 ADR 0014 與工單 01）：
+ * 品牌深紅取自公司官網 hok.com.tw，只用於識別（頁首、Logo、主要按鈕）；
+ * 及格/不及格/待審核一律使用下方 status-* 標準燈號色，
+ * 避免使用者把「品牌紅」誤讀成「不及格紅」。
+ */
+@theme {
+  /* 品牌 */
+  --color-brand-50: #fdf3f3;
+  --color-brand-100: #fbe5e6;
+  --color-brand-200: #f7cfd1;
+  --color-brand-300: #f0a8ac;
+  --color-brand-400: #e5757b;
+  --color-brand-500: #d54a52;
+  --color-brand-600: #bb1b21; /* 主色，取自官網按鈕 rgb(187,27,33) */
+  --color-brand-700: #9d171c;
+  --color-brand-800: #82171b;
+  --color-brand-900: #6d191c;
+
+  /* 狀態燈號（與品牌色互不共用） */
+  --color-status-pass: #15803d; /* 及格／已確認通過 */
+  --color-status-fail: #dc2626; /* 不及格 */
+  --color-status-pending: #b45309; /* 待核對 */
+  --color-status-flagged: #7c3aed; /* 存疑保留 */
+
+  /* 介面中性色 */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-ink: #1e293b;
+  --color-ink-muted: #64748b;
+  --color-line: #e2e8f0;
+
+  --font-sans: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui,
+    sans-serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-surface-muted);
+    color: var(--color-ink);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
