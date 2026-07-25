@@ -1,18 +1,24 @@
 import { Loader2 } from 'lucide-react'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { useAuth } from '@/auth/useAuth'
+import { AppShell } from '@/components/AppShell'
+import { canWrite } from '@/lib/roles'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
+import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 
 export default function App() {
   return (
     <AuthProvider>
-      <Routes />
+      <HashRouter>
+        <AppRoutes />
+      </HashRouter>
     </AuthProvider>
   )
 }
 
-function Routes() {
+function AppRoutes() {
   const { profile, loading } = useAuth()
 
   if (loading) {
@@ -24,5 +30,17 @@ function Routes() {
     )
   }
 
-  return profile ? <HomePage /> : <LoginPage />
+  if (!profile) return <LoginPage />
+
+  const writable = canWrite(profile.role)
+
+  return (
+    <AppShell>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppShell>
+  )
 }
