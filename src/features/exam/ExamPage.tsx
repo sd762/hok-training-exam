@@ -165,28 +165,41 @@ function ExamResult({
       </Card>
 
       {result.questions.map((q, i) => (
-        <Card key={q.question_id} className="p-5">
-          <p className="font-medium">
-            {i + 1}. {q.text}
-          </p>
-          <div className="mt-3 space-y-1">
-            {q.options.map((option, optIndex) => {
-              const originalPosition = q.option_order[optIndex]
-              const wasSelected = q.selected_original.includes(originalPosition)
-              const wasCorrect = q.answer_original.includes(originalPosition)
-              return (
-                <p key={optIndex} className={cn('text-sm', wasCorrect && 'font-medium text-status-pass')}>
-                  {option}
-                  {wasCorrect && <span className="ml-2 text-status-pass">✓ 正解</span>}
-                  {wasSelected && <span className="ml-2 text-ink-muted">（您的作答）</span>}
-                </p>
-              )
-            })}
+        <Card
+          key={q.question_id}
+          className={cn('p-5', q.is_correct ? 'bg-status-pass/10' : 'bg-status-fail/10')}
+        >
+          <div className="flex gap-3">
+            <span
+              className={cn(
+                'shrink-0 text-lg font-bold',
+                q.is_correct ? 'text-status-pass' : 'text-status-fail',
+              )}
+              aria-label={q.is_correct ? '答對' : '答錯'}
+            >
+              {q.is_correct ? '✓' : '✗'}
+            </span>
+            <div className="flex-1">
+              <p className="font-medium">
+                {i + 1}. {q.text}
+              </p>
+              <div className="mt-3 space-y-1">
+                {q.options.map((option, optIndex) => {
+                  const originalPosition = q.option_order[optIndex]
+                  const wasSelected = q.selected_original.includes(originalPosition)
+                  const wasCorrect = q.answer_original.includes(originalPosition)
+                  return (
+                    <p key={optIndex} className={cn('text-sm', wasCorrect && 'font-medium text-status-pass')}>
+                      {option}
+                      {wasCorrect && <span className="ml-2 text-status-pass">✓ 正解</span>}
+                      {wasSelected && <span className="ml-2 text-ink-muted">（您的作答）</span>}
+                    </p>
+                  )
+                })}
+              </div>
+              {q.explanation && <p className="mt-2 text-sm text-ink-muted">{q.explanation}</p>}
+            </div>
           </div>
-          <p className={q.is_correct ? 'mt-2 text-sm text-status-pass' : 'mt-2 text-sm text-status-fail'}>
-            {q.is_correct ? '✓ 答對' : '✗ 答錯'}
-          </p>
-          {q.explanation && <p className="mt-1 text-sm text-ink-muted">{q.explanation}</p>}
         </Card>
       ))}
 
