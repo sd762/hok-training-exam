@@ -47,7 +47,7 @@ export function useProctoring(
       }
 
       intervalId = window.setInterval(() => {
-        void tick()
+        tick().catch((err) => console.error('人臉偵測迴圈發生錯誤：', err))
       }, DETECTION_INTERVAL_MS)
     }
 
@@ -91,7 +91,7 @@ export function useProctoring(
       }
     }
 
-    void setup()
+    setup().catch((err) => console.error('監考鏡頭初始化失敗：', err))
 
     return () => {
       stopped = true
