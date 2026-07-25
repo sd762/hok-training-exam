@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx'
 import { LANG_LABELS, type LangCode, type QuestionInput } from './api'
 
-const MAX_OPTIONS = 6
+// 機構實際題庫皆為單選、固定 4 個選項，Excel 匯入格式依此簡化
+const MAX_OPTIONS = 4
 
 export interface ParsedQuestionRow {
   rowNumber: number
@@ -40,14 +41,14 @@ function parseAnswerPositions(raw: string): number[] {
     .filter((n) => Number.isInteger(n) && n >= 0)
 }
 
-/** 三語言共用同一套範本欄位：題型/分數/題目/選項/正確答案位置/解析 */
+/** 三語言共用同一套範本欄位：題目/選項1-4/正確答案位置（皆為單選題，每題固定4分） */
 export function downloadQuestionTemplate(langCode: LangCode) {
   const headers = [
-    '題型', '分數', '題目',
+    '題目',
     ...Array.from({ length: MAX_OPTIONS }, (_, i) => `選項${i + 1}`),
-    '正確答案位置（可填數字如 1 或 1,3，或字母如 A 或 A,C）', '解析',
+    '正確答案位置（可填數字如 1，或字母如 A）',
   ]
-  const example = ['單選', 4, '洗手應該遵守幾個時機？', '5個時機', '3個時機', '7個時機', '', '', '', 'A', '依據WHO洗手5時機準則']
+  const example = ['洗手應該遵守幾個時機？', '5個時機', '3個時機', '7個時機', '9個時機', 'A']
   const sheet = XLSX.utils.aoa_to_sheet([headers, example])
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, '題庫')
@@ -81,10 +82,9 @@ export async function parseQuestionFile(file: File): Promise<ParseResult> {
       return
     }
 
-    const qTypeLabel = String(line['題型'] ?? '單選').trim()
-    const score = Number(line['分數'] ?? 4) || 4
     const answerRaw = String(
-      line['正確答案位置（可填數字如 1 或 1,3，或字母如 A 或 A,C）'] ??
+      line['正確答案位置（可填數字如 1，或字母如 A）'] ??
+        line['正確答案位置（可填數字如 1 或 1,3，或字母如 A 或 A,C）'] ??
         line['正確答案位置（如 1 或 1,3）'] ??
         line['正確答案位置'] ??
         '',
@@ -97,12 +97,11 @@ export async function parseQuestionFile(file: File): Promise<ParseResult> {
 
     rows.push({
       rowNumber,
-      q_type: qTypeLabel === '複選' ? 'multiple' : 'single',
-      score,
+      q_type: 'single', // 機構實際題庫皆為單選
+      score: 4, // 每題固定 4 分（25題*4分=滿分100，見 ADR 0006）
       text,
       options,
       answer,
-      explanation: String(line['解析'] ?? '').trim() || undefined,
     })
   })
 
