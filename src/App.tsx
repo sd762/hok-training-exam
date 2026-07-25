@@ -9,6 +9,7 @@ import HomePage from '@/pages/HomePage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 import StaffPage from '@/features/staff/StaffPage'
 import QuestionsPage from '@/features/questions/QuestionsPage'
+import ExamPage from '@/features/exam/ExamPage'
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ function AppRoutes() {
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
         {writable && <Route path="/staff" element={<StaffPage />} />}
         {writable && <Route path="/questions" element={<QuestionsPage />} />}
+        {profile.role === 'staff' && <Route path="/exam" element={<ExamPage />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

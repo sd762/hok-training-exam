@@ -1,14 +1,17 @@
 import { Card } from '@/components/ui/Card'
 import { useAuth } from '@/auth/useAuth'
 import { ROLE_LABELS, canWrite } from '@/lib/roles'
+import StudentHome from '@/features/exam/StudentHome'
 
 /**
- * 登入後的落地頁。各角色的功能入口在頂部導覽列，
- * 此頁顯示身分摘要與後續會陸續補上的提示。
+ * 登入後的落地頁。學員看到的是應考狀態與測驗入口（StudentHome）；
+ * 其他角色看到帳號摘要，各角色的功能入口在頂部導覽列。
  */
 export default function HomePage() {
   const { profile } = useAuth()
   if (!profile) return null
+
+  if (profile.role === 'staff') return <StudentHome />
 
   return (
     <div className="space-y-6">
@@ -28,7 +31,7 @@ export default function HomePage() {
         <Card className="p-6">
           <h2 className="font-medium">開始使用</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            可從上方「學員管理」維護學員名單、「機構管理」維護機構清單。題庫管理等功能將陸續上線。
+            可從上方「學員管理」維護學員名單、「機構管理」維護機構清單、「題庫管理」維護測驗題目。
           </p>
         </Card>
       )}

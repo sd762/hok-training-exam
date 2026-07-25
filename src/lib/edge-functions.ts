@@ -1,15 +1,25 @@
 import { supabase } from '@/lib/supabase'
 
 /**
- * 呼叫需要 service_role 權限的 Edge Function（帳號建立/匯入/重設密碼/刪除）。
- * 自動帶上目前登入者的 session token，函式內部會反查呼叫者角色再決定放行與否。
+ * 呼叫 Edge Function 的共用邏輯。自動帶上目前登入者的 session token，
+ * 函式內部會反查呼叫者角色再決定放行與否，這裡不重複做權限判斷。
  */
-export async function callAdminUsers<T = unknown>(payload: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('admin-users', { body: payload })
+async function callEdgeFunction<T = unknown>(name: string, payload: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body: payload })
   if (error) {
     throw new Error(await extractErrorMessage(error))
   }
   return data as T
+}
+
+/** admin-users：帳號建立/匯入/重設密碼/刪除（僅系統管理者/平台管理者可用） */
+export async function callAdminUsers<T = unknown>(payload: Record<string, unknown>): Promise<T> {
+  return callEdgeFunction<T>('admin-users', payload)
+}
+
+/** take-exam：出題與評分（僅學員可用） */
+export async function callTakeExam<T = unknown>(payload: Record<string, unknown>): Promise<T> {
+  return callEdgeFunction<T>('take-exam', payload)
 }
 
 /**
