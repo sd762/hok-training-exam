@@ -69,6 +69,25 @@ export async function submitExam(attemptId: number, answers: number[][]): Promis
   return callTakeExam<SubmitResult>({ action: 'submit', attempt_id: attemptId, answers })
 }
 
+export interface ReportEventResult {
+  ok: boolean
+  aborted?: boolean
+  warningCount?: number
+}
+
+export async function reportProctoringEvent(
+  attemptId: number,
+  eventType: 'warning' | 'scheduled',
+  imageBase64: string,
+): Promise<ReportEventResult> {
+  return callTakeExam<ReportEventResult>({
+    action: 'report_event',
+    attempt_id: attemptId,
+    event_type: eventType,
+    image_base64: imageBase64,
+  })
+}
+
 /** 學員本人的語言別，用於切換整個作答流程的介面語言 */
 export async function fetchOwnLangCode(profileId: string): Promise<LangCode> {
   const { data, error } = await supabase

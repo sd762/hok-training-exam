@@ -81,6 +81,36 @@ const dict = {
   },
   result_back_to_status: { 'zh-TW': '返回應考狀態', vi: 'Về trạng thái thi', id: 'Kembali ke Status Ujian' },
 
+  consent_title: { 'zh-TW': '鏡頭監考同意書', vi: 'Đồng ý giám sát bằng camera', id: 'Persetujuan Pengawasan Kamera' },
+  consent_body: {
+    'zh-TW':
+      '測驗期間將全程開啟您的鏡頭（含手機前鏡頭），並在無預警的情況下擷取畫面，用以確認作答者為本人。若畫面中連續偵測不到人臉，系統會顯示提醒；累積達到一定次數會自動中止本次測驗並計入一次失敗。請確認您已了解並同意，才能開始測驗。',
+    vi: 'Trong suốt quá trình thi, camera của bạn (kể cả camera trước điện thoại) sẽ được bật liên tục và chụp ảnh màn hình bất kỳ lúc nào mà không báo trước, nhằm xác minh chính bạn là người làm bài. Nếu hệ thống không phát hiện khuôn mặt liên tục, sẽ có cảnh báo; nếu tích lũy đủ số lần, bài thi sẽ tự động bị hủy và tính là một lần trượt. Vui lòng xác nhận bạn đã hiểu và đồng ý trước khi bắt đầu.',
+    id: 'Selama ujian, kamera Anda (termasuk kamera depan ponsel) akan aktif terus-menerus dan mengambil gambar layar sewaktu-waktu tanpa pemberitahuan, untuk memverifikasi bahwa Anda sendiri yang mengerjakan ujian. Jika sistem tidak mendeteksi wajah secara terus-menerus, akan muncul peringatan; jika mencapai jumlah tertentu, ujian akan otomatis dibatalkan dan dihitung sebagai satu kali gagal. Mohon konfirmasi Anda telah memahami dan menyetujui sebelum memulai ujian.',
+  },
+  consent_agree_button: { 'zh-TW': '我同意，開始測驗', vi: 'Tôi đồng ý, bắt đầu thi', id: 'Saya setuju, mulai ujian' },
+  consent_decline_note: {
+    'zh-TW': '不同意將無法開始測驗',
+    vi: 'Nếu không đồng ý, bạn sẽ không thể bắt đầu thi',
+    id: 'Jika tidak setuju, Anda tidak dapat memulai ujian',
+  },
+  camera_denied: {
+    'zh-TW': '無法取得鏡頭權限，請允許瀏覽器使用鏡頭後再試一次',
+    vi: 'Không thể truy cập camera, vui lòng cho phép trình duyệt sử dụng camera rồi thử lại',
+    id: 'Tidak dapat mengakses kamera, mohon izinkan browser menggunakan kamera lalu coba lagi',
+  },
+  face_missing_warning: {
+    'zh-TW': '偵測不到您的臉，請正對鏡頭',
+    vi: 'Không phát hiện khuôn mặt của bạn, vui lòng nhìn thẳng vào camera',
+    id: 'Wajah Anda tidak terdeteksi, mohon hadap kamera',
+  },
+  aborted_title: { 'zh-TW': '測驗已中止', vi: 'Bài thi đã bị hủy', id: 'Ujian Dibatalkan' },
+  aborted_body: {
+    'zh-TW': '因多次偵測不到您的臉，本次測驗已自動中止，計入一次失敗。',
+    vi: 'Do nhiều lần không phát hiện khuôn mặt của bạn, bài thi này đã tự động bị hủy và tính là một lần trượt.',
+    id: 'Karena wajah Anda berulang kali tidak terdeteksi, ujian ini otomatis dibatalkan dan dihitung sebagai satu kali gagal.',
+  },
+
   error_generic: { 'zh-TW': '發生錯誤，請稍後再試', vi: 'Đã xảy ra lỗi, vui lòng thử lại sau', id: 'Terjadi kesalahan, silakan coba lagi nanti' },
 } as const
 

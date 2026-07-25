@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthProvider'
@@ -9,7 +10,9 @@ import HomePage from '@/pages/HomePage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 import StaffPage from '@/features/staff/StaffPage'
 import QuestionsPage from '@/features/questions/QuestionsPage'
-import ExamPage from '@/features/exam/ExamPage'
+
+// 監考用的 @mediapipe/tasks-vision 體積不小，只有學員進考試畫面才需要，延後載入
+const ExamPage = lazy(() => import('@/features/exam/ExamPage'))
 
 export default function App() {
   return (
@@ -44,7 +47,16 @@ function AppRoutes() {
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
         {writable && <Route path="/staff" element={<StaffPage />} />}
         {writable && <Route path="/questions" element={<QuestionsPage />} />}
-        {profile.role === 'staff' && <Route path="/exam" element={<ExamPage />} />}
+        {profile.role === 'staff' && (
+          <Route
+            path="/exam"
+            element={
+              <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="size-5 animate-spin text-ink-muted" aria-hidden /></div>}>
+                <ExamPage />
+              </Suspense>
+            }
+          />
+        )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

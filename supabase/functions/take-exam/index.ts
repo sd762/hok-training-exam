@@ -3,10 +3,13 @@
 // 出題與評分，全部在伺服器端執行，正確答案絕不送到瀏覽器（ADR 0007）。
 // 呼叫者必須是有效的學員（role = 'staff'）。
 //
-// 三個操作：
-//   status — 查詢目前應考哪個階段（供首頁提醒使用），不建立任何作答紀錄
-//   start  — 開始（或續答）測驗，回傳不含正解的題目快照
-//   submit — 送出作答，伺服器端評分並寫回資料庫
+// 四個操作：
+//   status       — 查詢目前應考哪個階段（供首頁提醒使用），不建立任何作答紀錄
+//   start        — 開始（或續答）測驗，回傳不含正解的題目快照
+//   submit       — 送出作答，伺服器端評分並寫回資料庫
+//   report_event — 監考事件回報（違規警告／定期排程快照），見 ADR 0005 2026-07-25 修訂。
+//                  是否累計滿 3 次警告、是否觸發自動中止，一律由這裡（伺服器端）權威判定，
+//                  不信任前端自行回報「已經中止」。
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -32,6 +35,9 @@ const MAX_ATTEMPTS_PER_CYCLE = 3
 const LOCKOUT_DAYS = 7
 const STAGE_ORDER = ['1m', '3m', '1y'] as const
 const STAGE_MONTHS: Record<string, number> = { '1m': 1, '3m': 3, '1y': 12 }
+
+// ---- 監考規則常數（ADR 0005 2026-07-25 修訂）----
+const MAX_WARNINGS_BEFORE_ABORT = 3
 
 type Stage = (typeof STAGE_ORDER)[number]
 
@@ -74,6 +80,8 @@ Deno.serve(async (req) => {
         return await handleStart(admin, profile.id)
       case 'submit':
         return await handleSubmit(admin, profile.id, body.attempt_id, body.answers)
+      case 'report_event':
+        return await handleReportEvent(admin, profile.id, body.attempt_id, body.event_type, body.image_base64)
       default:
         return jsonResponse({ error: `未知操作：${body.action}` }, 400)
     }
@@ -411,4 +419,65 @@ async function handleSubmit(
   const retry = passed ? null : await getCycleStatus(admin, staffId, attempt.exam_def_id)
 
   return jsonResponse({ score, passed, status, questions, retry })
+}
+
+// ---------------------------------------------------------------------------
+// report_event：監考事件回報（違規警告／定期排程快照）
+// ---------------------------------------------------------------------------
+async function handleReportEvent(
+  admin: ReturnType<typeof createClient>,
+  staffId: string,
+  attemptId: number,
+  eventType: 'warning' | 'scheduled',
+  imageBase64: string,
+) {
+  if (!attemptId || !imageBase64 || (eventType !== 'warning' && eventType !== 'scheduled')) {
+    return jsonResponse({ error: '請求格式錯誤' }, 400)
+  }
+
+  const { data: attempt } = await admin
+    .from('attempt')
+    .select('id, staff_id, status')
+    .eq('id', attemptId)
+    .maybeSingle()
+  if (!attempt || attempt.staff_id !== staffId) return jsonResponse({ error: '找不到此作答紀錄' }, 404)
+  if (attempt.status !== 'in_progress') {
+    // 已經送出或已中止的作答，不再接受新的監考事件（可能是畫面還沒關閉的殘留請求）
+    return jsonResponse({ ok: true, ignored: true })
+  }
+
+  const path = `${attemptId}/${Date.now()}-${eventType}.jpg`
+  const bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0))
+  const { error: uploadError } = await admin.storage
+    .from('proctoring')
+    .upload(path, bytes, { contentType: 'image/jpeg' })
+  if (uploadError) return jsonResponse({ error: uploadError.message }, 400)
+
+  const { error: insertError } = await admin
+    .from('proctoring_event')
+    .insert({ attempt_id: attemptId, event_type: eventType, storage_path: path })
+  if (insertError) return jsonResponse({ error: insertError.message }, 400)
+
+  if (eventType !== 'warning') {
+    return jsonResponse({ ok: true, aborted: false })
+  }
+
+  const { count: warningCount } = await admin
+    .from('proctoring_event')
+    .select('id', { count: 'exact', head: true })
+    .eq('attempt_id', attemptId)
+    .eq('event_type', 'warning')
+
+  if ((warningCount ?? 0) < MAX_WARNINGS_BEFORE_ABORT) {
+    return jsonResponse({ ok: true, aborted: false, warningCount })
+  }
+
+  // 累計滿 3 次警告：自動中止作答，計入一次失敗（ADR 0005 2026-07-25 修訂）
+  const { error: abortError } = await admin
+    .from('attempt')
+    .update({ status: 'failed', aborted_reason: 'proctoring_violations', submitted_at: new Date().toISOString() })
+    .eq('id', attemptId)
+  if (abortError) return jsonResponse({ error: abortError.message }, 400)
+
+  return jsonResponse({ ok: true, aborted: true, warningCount })
 }

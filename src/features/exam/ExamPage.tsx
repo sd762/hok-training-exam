@@ -1,39 +1,66 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useStudentLang } from './useStudentLang'
+import { useProctoring } from './useProctoring'
+import { ConsentScreen } from './ConsentScreen'
 import { startExam, submitExam, type StartResult, type SubmitResult } from './api'
 
 export default function ExamPage() {
   const { t } = useStudentLang()
   const navigate = useNavigate()
 
-  const [loading, setLoading] = useState(true)
+  const [consented, setConsented] = useState(false)
+  const [consentSubmitting, setConsentSubmitting] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<StartResult | null>(null)
   const [answers, setAnswers] = useState<number[][]>([])
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<SubmitResult | null>(null)
+  const [aborted, setAborted] = useState(false)
 
-  useEffect(() => {
-    startExam()
-      .then((data) => {
-        setSession(data)
-        setAnswers(data.questions.map(() => []))
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : t('error_generic')))
-      .finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  function stopCamera() {
+    stream?.getTracks().forEach((track) => track.stop())
+  }
+
+  // 分頁關閉/切換離開時，確保鏡頭一定會關掉
+  useEffect(() => stopCamera, [stream])
+
+  const { videoRef, showFaceWarning } = useProctoring(stream, session?.attempt_id ?? null, () => {
+    stopCamera()
+    setAborted(true)
+  })
+
+  async function handleConsent() {
+    setError(null)
+    setConsentSubmitting(true)
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      const data = await startExam()
+      setStream(mediaStream)
+      setSession(data)
+      setAnswers(data.questions.map(() => []))
+      setConsented(true)
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        setError(t('camera_denied'))
+      } else {
+        setError(err instanceof Error ? err.message : t('error_generic'))
+      }
+    } finally {
+      setConsentSubmitting(false)
+    }
+  }
 
   // 送出後畫面會切換到結果頁，但使用者當下多半捲到最後一題附近，
   // 得分卡在最上方看不到，需要主動捲回頂端
   useEffect(() => {
-    if (result) window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [result])
+    if (result || aborted) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [result, aborted])
 
   function toggleAnswer(qIndex: number, optionIndex: number, type: 'single' | 'multiple') {
     setAnswers((prev) =>
@@ -56,6 +83,7 @@ export default function ExamPage() {
     setError(null)
     try {
       const res = await submitExam(session.attempt_id, answers)
+      stopCamera()
       setResult(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('error_generic'))
@@ -64,20 +92,13 @@ export default function ExamPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-20 text-ink-muted">
-        <Loader2 className="size-5 animate-spin" aria-hidden />
-        {t('loading')}
-      </div>
-    )
-  }
-
-  if (error && !session) {
+  if (aborted) {
     return (
       <Card className="mx-auto max-w-lg p-6 text-center">
-        <p className="text-status-fail">{error}</p>
-        <Button className="mt-4" variant="outline" onClick={() => navigate('/')}>
+        <AlertTriangle className="mx-auto size-10 text-status-fail" aria-hidden />
+        <h1 className="mt-3 text-lg font-semibold text-status-fail">{t('aborted_title')}</h1>
+        <p className="mt-2 text-sm text-ink-muted">{t('aborted_body')}</p>
+        <Button className="mt-6 w-full" variant="outline" onClick={() => navigate('/')}>
           {t('back_home')}
         </Button>
       </Card>
@@ -85,6 +106,11 @@ export default function ExamPage() {
   }
 
   if (result) return <ExamResult result={result} t={t} onBack={() => navigate('/')} />
+
+  if (!consented) {
+    return <ConsentScreen onAgree={handleConsent} submitting={consentSubmitting} error={error} />
+  }
+
   if (!session) return null
 
   const answeredCount = answers.filter((a) => a.length > 0).length
@@ -95,6 +121,16 @@ export default function ExamPage() {
         <p className="text-sm font-medium">
           {session.exam.title} · {answeredCount}/{session.questions.length}
         </p>
+      </div>
+
+      {/* 監考鏡頭預覽：固定在角落，讓學員知道鏡頭正在運作中 */}
+      <div className="fixed bottom-4 right-4 z-20 overflow-hidden rounded-lg border-2 border-line shadow-lg">
+        <video ref={videoRef} autoPlay muted playsInline className="h-24 w-32 bg-ink object-cover" />
+        {showFaceWarning && (
+          <div className="absolute inset-0 flex items-center justify-center bg-status-fail/80 p-1 text-center text-xs text-white">
+            {t('face_missing_warning')}
+          </div>
+        )}
       </div>
 
       {session.questions.map((q, qIndex) => (
