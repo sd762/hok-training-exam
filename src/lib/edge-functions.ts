@@ -27,6 +27,11 @@ export async function callReviewAttempt<T = unknown>(payload: Record<string, unk
   return callEdgeFunction<T>('review-attempt', payload)
 }
 
+/** check-notifications：手動觸發到期通知檢查（僅系統管理者/平台管理者可用；GitHub Actions 排程走另一種驗證方式，不經過這裡） */
+export async function callCheckNotifications<T = unknown>(): Promise<T> {
+  return callEdgeFunction<T>('check-notifications', {})
+}
+
 /**
  * supabase-js 對 Edge Function 錯誤的包裝形狀依錯誤類型而不同：
  * - FunctionsHttpError（函式回了非 2xx）：context 是一個 Response，可 .json()

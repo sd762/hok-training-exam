@@ -11,6 +11,7 @@ import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 import StaffPage from '@/features/staff/StaffPage'
 import QuestionsPage from '@/features/questions/QuestionsPage'
 import ReviewPage from '@/features/review/ReviewPage'
+import NotificationsPage from '@/features/notifications/NotificationsPage'
 
 // 監考用的 @mediapipe/tasks-vision 體積不小，只有學員進考試畫面才需要，延後載入
 const ExamPage = lazy(() => import('@/features/exam/ExamPage'))
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         {writable && <Route path="/review" element={<ReviewPage />} />}
+        {writable && <Route path="/notifications" element={<NotificationsPage />} />}
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
         {writable && <Route path="/staff" element={<StaffPage />} />}
         {writable && <Route path="/questions" element={<QuestionsPage />} />}

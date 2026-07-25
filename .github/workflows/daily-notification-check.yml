@@ -1,0 +1,25 @@
+name: 每日到期通知檢查（含保活）
+
+# 每天呼叫一次 check-notifications，這個呼叫本身同時達成保活 Supabase 免費專案的
+# 目的（避免連續 7 天無 API 活動被自動暫停），不需要另外開一支假的保活工作（ADR 0003）。
+on:
+  schedule:
+    - cron: '0 17 * * *' # 每天 UTC 17:00 = 台北時間凌晨 01:00，離峰時段
+  workflow_dispatch: # 允許手動觸發，方便驗證排程本身有沒有設定正確
+
+jobs:
+  check-notifications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 呼叫 check-notifications
+        run: |
+          http_status=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ vars.VITE_SUPABASE_URL }}/functions/v1/check-notifications")
+          echo "HTTP 狀態碼：$http_status"
+          cat response.json
+          if [ "$http_status" -ge 300 ]; then
+            echo "::error::check-notifications 回應非成功狀態碼"
+            exit 1
+          fi
