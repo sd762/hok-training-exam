@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
 import {
   createQuestion,
+  deleteQuestion,
   fetchExamDefs,
   fetchQuestions,
   LANG_CODES,
@@ -66,6 +67,16 @@ export default function QuestionsPage() {
       if (selectedExamId !== null) await reloadQuestions(selectedExamId, langCode)
     } catch (err) {
       setError(err instanceof Error ? err.message : '狀態切換失敗')
+    }
+  }
+
+  async function handleDelete(row: QuestionRow) {
+    if (!confirm(`確定要刪除這題嗎？此動作無法復原。\n\n${row.text}`)) return
+    try {
+      await deleteQuestion(row)
+      if (selectedExamId !== null) await reloadQuestions(selectedExamId, langCode)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '刪除失敗')
     }
   }
 
@@ -175,6 +186,11 @@ export default function QuestionsPage() {
                       <Button size="sm" variant="ghost" onClick={() => handleToggleActive(q)}>
                         {q.is_active ? '停用' : '啟用'}
                       </Button>
+                      {!q.is_active && (
+                        <Button size="sm" variant="ghost" onClick={() => handleDelete(q)}>
+                          刪除
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

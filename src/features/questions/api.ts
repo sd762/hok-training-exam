@@ -124,6 +124,13 @@ export async function setQuestionActive(id: number, isActive: boolean): Promise<
   if (error) throw error
 }
 
+/** 只能刪除已停用的題目，避免誤刪還在使用中的題目（與學員管理相同的安全性設計） */
+export async function deleteQuestion(row: Pick<QuestionRow, 'id' | 'is_active'>): Promise<void> {
+  if (row.is_active) throw new Error('啟用中的題目無法刪除，請先停用')
+  const { error } = await supabase.from('question_bank').delete().eq('id', row.id)
+  if (error) throw error
+}
+
 /** 批次建立題目（Excel 匯入用）。逐筆建立，任何一筆失敗不影響其他筆。 */
 export async function bulkCreateQuestions(
   inputs: QuestionInput[],
