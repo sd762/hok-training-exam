@@ -9,31 +9,39 @@ export interface ExamDef {
   is_active: boolean
 }
 
-export interface Translation {
-  lang_code: string
-  text: string
-  options: string[]
-  explanation: string | null
+export const LANG_CODES = ['zh-TW', 'vi', 'id'] as const
+export type LangCode = (typeof LANG_CODES)[number]
+
+export const LANG_LABELS: Record<LangCode, string> = {
+  'zh-TW': '繁體中文',
+  vi: '越南文',
+  id: '印尼文',
 }
 
 export interface QuestionRow {
   id: number
   exam_def_id: number
+  lang_code: LangCode
   q_type: 'single' | 'multiple'
   score: number
-  is_active: boolean
-  /** 正確答案在「原始選項順序」中的位置（0-based），呼應 ADR 0007/0010 的答案鎖定機制 */
+  text: string
+  options: string[]
+  /** 正確答案在 options 中的位置（0-based） */
   answer: number[]
-  translations: Record<string, Translation>
+  explanation: string | null
+  is_active: boolean
 }
 
 export interface QuestionInput {
   id?: number
   exam_def_id: number
+  lang_code: LangCode
   q_type: 'single' | 'multiple'
   score: number
+  text: string
+  options: string[]
   answer: number[]
-  translations: Record<string, { text: string; options: string[]; explanation?: string }>
+  explanation?: string
 }
 
 export async function fetchExamDefs(): Promise<ExamDef[]> {
@@ -45,97 +53,69 @@ export async function fetchExamDefs(): Promise<ExamDef[]> {
   return data
 }
 
-export async function fetchQuestions(examDefId: number): Promise<QuestionRow[]> {
+export async function fetchQuestions(examDefId: number, langCode: LangCode): Promise<QuestionRow[]> {
   const { data, error } = await supabase
     .from('question_bank')
-    .select(
-      `id, exam_def_id, q_type, score, is_active, answer_json,
-       question_translation ( lang_code, text, options_json, explanation )`,
-    )
+    .select('id, exam_def_id, lang_code, q_type, score, text, options_json, answer_json, explanation, is_active')
     .eq('exam_def_id', examDefId)
+    .eq('lang_code', langCode)
     .order('id')
   if (error) throw error
 
   return (data as unknown as RawQuestionRow[]).map((row) => ({
     id: row.id,
     exam_def_id: row.exam_def_id,
+    lang_code: row.lang_code,
     q_type: row.q_type,
     score: row.score,
-    is_active: row.is_active,
+    text: row.text,
+    options: row.options_json as string[],
     answer: row.answer_json as number[],
-    translations: Object.fromEntries(
-      row.question_translation.map((t) => [
-        t.lang_code,
-        { lang_code: t.lang_code, text: t.text, options: t.options_json as string[], explanation: t.explanation },
-      ]),
-    ),
+    explanation: row.explanation,
+    is_active: row.is_active,
   }))
 }
 
 interface RawQuestionRow {
   id: number
   exam_def_id: number
+  lang_code: LangCode
   q_type: 'single' | 'multiple'
   score: number
-  is_active: boolean
+  text: string
+  options_json: unknown
   answer_json: unknown
-  question_translation: { lang_code: string; text: string; options_json: unknown; explanation: string | null }[]
+  explanation: string | null
+  is_active: boolean
 }
 
 export async function createQuestion(input: QuestionInput): Promise<void> {
-  const zhTW = input.translations['zh-TW']
-  if (!zhTW) throw new Error('繁體中文為必填')
-
-  const { data: question, error } = await supabase
-    .from('question_bank')
-    .insert({
-      exam_def_id: input.exam_def_id,
-      q_type: input.q_type,
-      score: input.score,
-      answer_json: input.answer,
-    })
-    .select('id')
-    .single()
+  const { error } = await supabase.from('question_bank').insert({
+    exam_def_id: input.exam_def_id,
+    lang_code: input.lang_code,
+    q_type: input.q_type,
+    score: input.score,
+    text: input.text,
+    options_json: input.options,
+    answer_json: input.answer,
+    explanation: input.explanation || null,
+  })
   if (error) throw error
-
-  await writeTranslations(question.id, input.translations)
 }
 
 export async function updateQuestion(input: QuestionInput): Promise<void> {
   if (!input.id) throw new Error('缺少題目 ID')
-
   const { error } = await supabase
     .from('question_bank')
     .update({
-      exam_def_id: input.exam_def_id,
       q_type: input.q_type,
       score: input.score,
+      text: input.text,
+      options_json: input.options,
       answer_json: input.answer,
+      explanation: input.explanation || null,
     })
     .eq('id', input.id)
-  if (error) throw error
-
-  await writeTranslations(input.id, input.translations)
-}
-
-async function writeTranslations(
-  questionId: number,
-  translations: Record<string, { text: string; options: string[]; explanation?: string }>,
-) {
-  const rows = Object.entries(translations)
-    .filter(([, t]) => t.text.trim())
-    .map(([lang_code, t]) => ({
-      question_id: questionId,
-      lang_code,
-      text: t.text,
-      options_json: t.options,
-      explanation: t.explanation || null,
-    }))
-  if (rows.length === 0) return
-
-  const { error } = await supabase
-    .from('question_translation')
-    .upsert(rows, { onConflict: 'question_id,lang_code' })
   if (error) throw error
 }
 
@@ -144,7 +124,7 @@ export async function setQuestionActive(id: number, isActive: boolean): Promise<
   if (error) throw error
 }
 
-/** 批次建立中文題目（Excel 匯入用）。逐筆建立，任何一筆失敗不影響其他筆。 */
+/** 批次建立題目（Excel 匯入用）。逐筆建立，任何一筆失敗不影響其他筆。 */
 export async function bulkCreateQuestions(
   inputs: QuestionInput[],
 ): Promise<{ index: number; error?: string }[]> {
@@ -156,28 +136,6 @@ export async function bulkCreateQuestions(
     } catch (err) {
       results.push({ index: i, error: err instanceof Error ? err.message : '建立失敗' })
     }
-  }
-  return results
-}
-
-/** 批次補上／更新指定語言的翻譯（不影響繁體中文與答案位置） */
-export async function bulkImportTranslations(
-  rows: { questionId: number; text: string; options: string[]; explanation?: string; lang_code: string }[],
-): Promise<{ index: number; error?: string }[]> {
-  const results: { index: number; error?: string }[] = []
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    const { error } = await supabase.from('question_translation').upsert(
-      {
-        question_id: row.questionId,
-        lang_code: row.lang_code,
-        text: row.text,
-        options_json: row.options,
-        explanation: row.explanation || null,
-      },
-      { onConflict: 'question_id,lang_code' },
-    )
-    results.push(error ? { index: i, error: error.message } : { index: i })
   }
   return results
 }
