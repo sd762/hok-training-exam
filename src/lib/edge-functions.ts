@@ -22,6 +22,11 @@ export async function callTakeExam<T = unknown>(payload: Record<string, unknown>
   return callEdgeFunction<T>('take-exam', payload)
 }
 
+/** review-attempt：審查及格作答、簽發監考快照連結（僅系統管理者/平台管理者可用） */
+export async function callReviewAttempt<T = unknown>(payload: Record<string, unknown>): Promise<T> {
+  return callEdgeFunction<T>('review-attempt', payload)
+}
+
 /**
  * supabase-js 對 Edge Function 錯誤的包裝形狀依錯誤類型而不同：
  * - FunctionsHttpError（函式回了非 2xx）：context 是一個 Response，可 .json()

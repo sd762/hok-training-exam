@@ -12,6 +12,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { to: '/review', label: '審查', visibleTo: canWrite },
   { to: '/staff', label: '學員管理', visibleTo: canWrite },
   { to: '/questions', label: '題庫管理', visibleTo: canWrite },
   { to: '/institutions', label: '機構管理', visibleTo: canWrite },
