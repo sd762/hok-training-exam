@@ -8,6 +8,7 @@ import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 import StaffPage from '@/features/staff/StaffPage'
+import QuestionsPage from '@/features/questions/QuestionsPage'
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
         {writable && <Route path="/staff" element={<StaffPage />} />}
+        {writable && <Route path="/questions" element={<QuestionsPage />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
