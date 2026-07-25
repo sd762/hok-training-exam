@@ -18,14 +18,36 @@ export interface ParseResult {
   errors: { rowNumber: number; message: string }[]
 }
 
+/**
+ * 解析「正確答案位置」欄位，同時支援數字（1、1,3）與字母（A、A,C、AC）兩種標示方式
+ * ——機構實際提供的正式題庫檔案用的是字母標示（A/B/C/D），數字則是本系統原本設計的範本格式。
+ * 回傳 0-based 的選項位置陣列。
+ */
+function parseAnswerPositions(raw: string): number[] {
+  if (!raw) return []
+
+  const isAllLetters = /^[A-Za-z]+$/.test(raw)
+  // 純字母且沒有分隔符（如 "AC"）視為每個字母各自代表一個答案位置
+  const tokens = isAllLetters && raw.length > 1 ? raw.split('') : raw.split(/[,，、\s]+/).filter(Boolean)
+
+  return tokens
+    .map((token) => {
+      const t = token.trim()
+      if (/^[A-Za-z]$/.test(t)) return t.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0)
+      const n = Number(t)
+      return Number.isFinite(n) ? n - 1 : NaN
+    })
+    .filter((n) => Number.isInteger(n) && n >= 0)
+}
+
 /** 三語言共用同一套範本欄位：題型/分數/題目/選項/正確答案位置/解析 */
 export function downloadQuestionTemplate(langCode: LangCode) {
   const headers = [
     '題型', '分數', '題目',
     ...Array.from({ length: MAX_OPTIONS }, (_, i) => `選項${i + 1}`),
-    '正確答案位置（如 1 或 1,3）', '解析',
+    '正確答案位置（可填數字如 1 或 1,3，或字母如 A 或 A,C）', '解析',
   ]
-  const example = ['單選', 4, '洗手應該遵守幾個時機？', '5個時機', '3個時機', '7個時機', '', '', '', '1', '依據WHO洗手5時機準則']
+  const example = ['單選', 4, '洗手應該遵守幾個時機？', '5個時機', '3個時機', '7個時機', '', '', '', 'A', '依據WHO洗手5時機準則']
   const sheet = XLSX.utils.aoa_to_sheet([headers, example])
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, '題庫')
@@ -61,11 +83,13 @@ export async function parseQuestionFile(file: File): Promise<ParseResult> {
 
     const qTypeLabel = String(line['題型'] ?? '單選').trim()
     const score = Number(line['分數'] ?? 4) || 4
-    const answerRaw = String(line['正確答案位置（如 1 或 1,3）'] ?? line['正確答案位置'] ?? '').trim()
-    const answer = answerRaw
-      .split(',')
-      .map((s) => Number(s.trim()) - 1)
-      .filter((n) => Number.isInteger(n) && n >= 0)
+    const answerRaw = String(
+      line['正確答案位置（可填數字如 1 或 1,3，或字母如 A 或 A,C）'] ??
+        line['正確答案位置（如 1 或 1,3）'] ??
+        line['正確答案位置'] ??
+        '',
+    ).trim()
+    const answer = parseAnswerPositions(answerRaw)
     if (answer.length === 0 || answer.some((n) => n >= options.length)) {
       errors.push({ rowNumber, message: `正確答案位置「${answerRaw}」無效` })
       return
