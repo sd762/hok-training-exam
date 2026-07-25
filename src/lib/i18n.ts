@@ -58,6 +58,10 @@ const dict = {
     vi: 'Còn {n} câu chưa trả lời, bạn có chắc muốn nộp bài không?',
     id: 'Masih ada {n} soal yang belum dijawab, yakin ingin mengirim?',
   },
+  your_answer_label: { 'zh-TW': '（您的作答）', vi: '（Câu trả lời của bạn）', id: '（Jawaban Anda）' },
+  correct_answer_label: { 'zh-TW': '✓ 正解', vi: '✓ Đáp án đúng', id: '✓ Jawaban benar' },
+  answer_correct: { 'zh-TW': '答對', vi: 'Đúng', id: 'Benar' },
+  answer_incorrect: { 'zh-TW': '答錯', vi: 'Sai', id: 'Salah' },
   single_choice_hint: { 'zh-TW': '（單選）', vi: '（Chọn một）', id: '（Pilih satu）' },
   multiple_choice_hint: { 'zh-TW': '（複選）', vi: '（Chọn nhiều）', id: '（Pilih lebih dari satu）' },
 
@@ -104,11 +108,21 @@ const dict = {
     vi: 'Không phát hiện khuôn mặt của bạn, vui lòng nhìn thẳng vào camera',
     id: 'Wajah Anda tidak terdeteksi, mohon hadap kamera',
   },
+  tab_switch_warning: {
+    'zh-TW': '偵測到您離開了測驗畫面，這是第 1 次警告，再發生一次將直接中止測驗並計入一次失敗',
+    vi: 'Phát hiện bạn rời khỏi màn hình thi, đây là cảnh báo lần 1, nếu tái phạm bài thi sẽ bị hủy ngay và tính là một lần trượt',
+    id: 'Terdeteksi Anda meninggalkan layar ujian, ini adalah peringatan ke-1, jika terulang ujian akan langsung dibatalkan dan dihitung sebagai satu kali gagal',
+  },
   aborted_title: { 'zh-TW': '測驗已中止', vi: 'Bài thi đã bị hủy', id: 'Ujian Dibatalkan' },
-  aborted_body: {
+  aborted_body_face: {
     'zh-TW': '因多次偵測不到您的臉，本次測驗已自動中止，計入一次失敗。',
     vi: 'Do nhiều lần không phát hiện khuôn mặt của bạn, bài thi này đã tự động bị hủy và tính là một lần trượt.',
     id: 'Karena wajah Anda berulang kali tidak terdeteksi, ujian ini otomatis dibatalkan dan dihitung sebagai satu kali gagal.',
+  },
+  aborted_body_tab_switch: {
+    'zh-TW': '因多次離開測驗畫面（切換視窗/離開頁面），本次測驗已自動中止，計入一次失敗。',
+    vi: 'Do nhiều lần rời khỏi màn hình thi (chuyển cửa sổ/rời trang), bài thi này đã tự động bị hủy và tính là một lần trượt.',
+    id: 'Karena berulang kali meninggalkan layar ujian (beralih jendela/keluar halaman), ujian ini otomatis dibatalkan dan dihitung sebagai satu kali gagal.',
   },
 
   error_generic: { 'zh-TW': '發生錯誤，請稍後再試', vi: 'Đã xảy ra lỗi, vui lòng thử lại sau', id: 'Terjadi kesalahan, silakan coba lagi nanti' },

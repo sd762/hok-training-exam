@@ -424,14 +424,26 @@ async function handleSubmit(
 // ---------------------------------------------------------------------------
 // report_event：監考事件回報（違規警告／定期排程快照）
 // ---------------------------------------------------------------------------
+type ProctoringEventType = 'warning' | 'scheduled' | 'tab_switch'
+
+// 各事件類型累積到幾次才自動中止；'scheduled' 不在此表中代表它永遠不會觸發中止
+const ABORT_THRESHOLD: Partial<Record<ProctoringEventType, number>> = {
+  warning: MAX_WARNINGS_BEFORE_ABORT, // 人臉連續消失，3 次緩衝（誤判風險較高：光線、低頭寫字）
+  tab_switch: 2, // 切換視窗/離開頁面，2 次即中止（誤判風險較低，門檻更嚴格）
+}
+const ABORT_REASON: Partial<Record<ProctoringEventType, string>> = {
+  warning: 'proctoring_violations',
+  tab_switch: 'tab_switch',
+}
+
 async function handleReportEvent(
   admin: ReturnType<typeof createClient>,
   staffId: string,
   attemptId: number,
-  eventType: 'warning' | 'scheduled',
-  imageBase64: string,
+  eventType: ProctoringEventType,
+  imageBase64?: string,
 ) {
-  if (!attemptId || !imageBase64 || (eventType !== 'warning' && eventType !== 'scheduled')) {
+  if (!attemptId || !['warning', 'scheduled', 'tab_switch'].includes(eventType)) {
     return jsonResponse({ error: '請求格式錯誤' }, 400)
   }
 
@@ -446,38 +458,47 @@ async function handleReportEvent(
     return jsonResponse({ ok: true, ignored: true })
   }
 
-  const path = `${attemptId}/${Date.now()}-${eventType}.jpg`
-  const bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0))
-  const { error: uploadError } = await admin.storage
-    .from('proctoring')
-    .upload(path, bytes, { contentType: 'image/jpeg' })
-  if (uploadError) return jsonResponse({ error: uploadError.message }, 400)
+  // 切換視窗當下鏡頭畫面不一定拍得到（分頁被隱藏），沒有圖片也照樣記錄事件，只是沒有快照佐證
+  let path: string | null = null
+  if (imageBase64) {
+    path = `${attemptId}/${Date.now()}-${eventType}.jpg`
+    const bytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0))
+    const { error: uploadError } = await admin.storage
+      .from('proctoring')
+      .upload(path, bytes, { contentType: 'image/jpeg' })
+    if (uploadError) return jsonResponse({ error: uploadError.message }, 400)
+  }
 
   const { error: insertError } = await admin
     .from('proctoring_event')
     .insert({ attempt_id: attemptId, event_type: eventType, storage_path: path })
   if (insertError) return jsonResponse({ error: insertError.message }, 400)
 
-  if (eventType !== 'warning') {
+  const threshold = ABORT_THRESHOLD[eventType]
+  if (!threshold) {
     return jsonResponse({ ok: true, aborted: false })
   }
 
-  const { count: warningCount } = await admin
+  const { count: eventCount } = await admin
     .from('proctoring_event')
     .select('id', { count: 'exact', head: true })
     .eq('attempt_id', attemptId)
-    .eq('event_type', 'warning')
+    .eq('event_type', eventType)
 
-  if ((warningCount ?? 0) < MAX_WARNINGS_BEFORE_ABORT) {
-    return jsonResponse({ ok: true, aborted: false, warningCount })
+  if ((eventCount ?? 0) < threshold) {
+    return jsonResponse({ ok: true, aborted: false, eventCount })
   }
 
-  // 累計滿 3 次警告：自動中止作答，計入一次失敗（ADR 0005 2026-07-25 修訂）
+  // 累積達到門檻：自動中止作答，計入一次失敗（ADR 0005 2026-07-25 修訂）
   const { error: abortError } = await admin
     .from('attempt')
-    .update({ status: 'failed', aborted_reason: 'proctoring_violations', submitted_at: new Date().toISOString() })
+    .update({
+      status: 'failed',
+      aborted_reason: ABORT_REASON[eventType],
+      submitted_at: new Date().toISOString(),
+    })
     .eq('id', attemptId)
   if (abortError) return jsonResponse({ error: abortError.message }, 400)
 
-  return jsonResponse({ ok: true, aborted: true, warningCount })
+  return jsonResponse({ ok: true, aborted: true, eventCount })
 }

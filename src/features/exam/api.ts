@@ -72,13 +72,13 @@ export async function submitExam(attemptId: number, answers: number[][]): Promis
 export interface ReportEventResult {
   ok: boolean
   aborted?: boolean
-  warningCount?: number
+  eventCount?: number
 }
 
 export async function reportProctoringEvent(
   attemptId: number,
-  eventType: 'warning' | 'scheduled',
-  imageBase64: string,
+  eventType: 'warning' | 'scheduled' | 'tab_switch',
+  imageBase64?: string,
 ): Promise<ReportEventResult> {
   return callTakeExam<ReportEventResult>({
     action: 'report_event',

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useStudentLang } from './useStudentLang'
 import { useProctoring } from './useProctoring'
+import { useTabSwitchGuard } from './useTabSwitchGuard'
 import { ConsentScreen } from './ConsentScreen'
 import { startExam, submitExam, type StartResult, type SubmitResult } from './api'
 
@@ -21,7 +22,8 @@ export default function ExamPage() {
   const [answers, setAnswers] = useState<number[][]>([])
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<SubmitResult | null>(null)
-  const [aborted, setAborted] = useState(false)
+  const [abortedReason, setAbortedReason] = useState<'face' | 'tab_switch' | null>(null)
+  const [tabSwitchWarned, setTabSwitchWarned] = useState(false)
 
   function stopCamera() {
     stream?.getTracks().forEach((track) => track.stop())
@@ -30,10 +32,18 @@ export default function ExamPage() {
   // 分頁關閉/切換離開時，確保鏡頭一定會關掉
   useEffect(() => stopCamera, [stream])
 
-  const { videoRef, showFaceWarning } = useProctoring(stream, session?.attempt_id ?? null, () => {
+  function handleAborted(reason: 'face' | 'tab_switch') {
     stopCamera()
-    setAborted(true)
-  })
+    setAbortedReason(reason)
+  }
+
+  const { videoRef, showFaceWarning } = useProctoring(stream, session?.attempt_id ?? null, () =>
+    handleAborted('face'),
+  )
+
+  useTabSwitchGuard(session?.attempt_id ?? null, videoRef, () => setTabSwitchWarned(true), () =>
+    handleAborted('tab_switch'),
+  )
 
   async function handleConsent() {
     setError(null)
@@ -59,8 +69,8 @@ export default function ExamPage() {
   // 送出後畫面會切換到結果頁，但使用者當下多半捲到最後一題附近，
   // 得分卡在最上方看不到，需要主動捲回頂端
   useEffect(() => {
-    if (result || aborted) window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [result, aborted])
+    if (result || abortedReason) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [result, abortedReason])
 
   function toggleAnswer(qIndex: number, optionIndex: number, type: 'single' | 'multiple') {
     setAnswers((prev) =>
@@ -92,12 +102,14 @@ export default function ExamPage() {
     }
   }
 
-  if (aborted) {
+  if (abortedReason) {
     return (
       <Card className="mx-auto max-w-lg p-6 text-center">
         <AlertTriangle className="mx-auto size-10 text-status-fail" aria-hidden />
         <h1 className="mt-3 text-lg font-semibold text-status-fail">{t('aborted_title')}</h1>
-        <p className="mt-2 text-sm text-ink-muted">{t('aborted_body')}</p>
+        <p className="mt-2 text-sm text-ink-muted">
+          {t(abortedReason === 'face' ? 'aborted_body_face' : 'aborted_body_tab_switch')}
+        </p>
         <Button className="mt-6 w-full" variant="outline" onClick={() => navigate('/')}>
           {t('back_home')}
         </Button>
@@ -116,18 +128,31 @@ export default function ExamPage() {
   const answeredCount = answers.filter((a) => a.length > 0).length
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 pb-24">
       <div className="sticky top-0 z-10 -mx-6 border-b border-line bg-surface-muted px-6 py-3">
         <p className="text-sm font-medium">
           {session.exam.title} · {answeredCount}/{session.questions.length}
         </p>
       </div>
 
-      {/* 監考鏡頭預覽：固定在角落，讓學員知道鏡頭正在運作中 */}
+      {tabSwitchWarned && (
+        <div className="rounded-lg border border-status-fail/30 bg-status-fail/10 p-3 text-sm text-status-fail">
+          {t('tab_switch_warning')}
+        </div>
+      )}
+
+      {/* 監考鏡頭預覽：固定在角落，讓學員知道鏡頭正在運作中。
+          手機螢幕較小，縮小尺寸；下方內容留白（pb-28）避免被這個固定元素蓋住送出按鈕 */}
       <div className="fixed bottom-4 right-4 z-20 overflow-hidden rounded-lg border-2 border-line shadow-lg">
-        <video ref={videoRef} autoPlay muted playsInline className="h-24 w-32 bg-ink object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="h-16 w-20 bg-ink object-cover sm:h-24 sm:w-32"
+        />
         {showFaceWarning && (
-          <div className="absolute inset-0 flex items-center justify-center bg-status-fail/80 p-1 text-center text-xs text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-status-fail/80 p-1 text-center text-[10px] text-white sm:text-xs">
             {t('face_missing_warning')}
           </div>
         )}
@@ -211,7 +236,7 @@ function ExamResult({
                 'shrink-0 text-lg font-bold',
                 q.is_correct ? 'text-status-pass' : 'text-status-fail',
               )}
-              aria-label={q.is_correct ? '答對' : '答錯'}
+              aria-label={q.is_correct ? t('answer_correct') : t('answer_incorrect')}
             >
               {q.is_correct ? '✓' : '✗'}
             </span>
@@ -227,8 +252,8 @@ function ExamResult({
                   return (
                     <p key={optIndex} className={cn('text-sm', wasCorrect && 'font-medium text-status-pass')}>
                       {option}
-                      {wasCorrect && <span className="ml-2 text-status-pass">✓ 正解</span>}
-                      {wasSelected && <span className="ml-2 text-ink-muted">（您的作答）</span>}
+                      {wasCorrect && <span className="ml-2 text-status-pass">{t('correct_answer_label')}</span>}
+                      {wasSelected && <span className="ml-2 text-ink-muted">{t('your_answer_label')}</span>}
                     </p>
                   )
                 })}
