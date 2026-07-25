@@ -7,6 +7,7 @@ import { canWrite } from '@/lib/roles'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
+import StaffPage from '@/features/staff/StaffPage'
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}
+        {writable && <Route path="/staff" element={<StaffPage />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

@@ -19,3 +19,12 @@
 - 需要額外學習/撰寫 Edge Function（Deno runtime，TypeScript），比純前端直連資料庫多一層開發複雜度
 - Supabase 免費方案的 Edge Function 呼叫次數有額度限制，需留意用量（**確切額度待查證，屬於待確認事項**）
 - 題庫資料表本身的 RLS 政策需設計成「一般前端連線讀不到 `answer_json` 欄位或整張表」，只有 Edge Function 用的 service role 金鑰能存取完整題目資料
+
+## 部署與除錯踩雷紀錄（2026-07-25，第一支 Edge Function `admin-users`）
+
+- **Dashboard 建立函式時務必先打對名稱再貼程式碼**：Settings 頁面的「Name」欄位只是顯示用別名，**不會改變已建立的網址 slug**（畫面上寫著「Your slug and endpoint URL will remain the same」）。名稱打錯只能刪掉重建，沒有事後改名的路。
+- **一定要處理 CORS**，否則瀏覽器呼叫時的 OPTIONS 預檢請求會被直接擋在網路層，函式程式碼完全不會被執行到；前端會收到一個不是正常 HTTP 回應的錯誤物件，症狀難以判讀（在這個專案上實際出現的訊息是 `context.json is not a function`，來自我方前端的錯誤處理程式碼假設「錯誤一定有 Response 可以 `.json()`」，這個假設本身就不成立，一併修正）。每支要給瀏覽器呼叫的 Edge Function 都需要：
+  - `OPTIONS` 方法直接回一個帶 `Access-Control-Allow-*` 標頭的空回應
+  - 其餘所有回應（含錯誤與例外）也都要帶同一組標頭，否則「函式回了但沒有 CORS 標頭」一樣會被瀏覽器擋下、呈現跟網路失敗一樣的症狀
+  - 整個處理邏輯包一層 `try/catch`，避免未預期例外讓 Deno 回傳一個沒有 CORS 標頭的預設錯誤頁
+- 「Verify JWT with legacy secret」建議關閉（Dashboard 自己的建議），因為函式內部已經自己驗證呼叫者身分（反查 `profiles.role`），不需要平台再疊一層不透明的 JWT 檢查。

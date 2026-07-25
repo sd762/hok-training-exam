@@ -28,7 +28,7 @@ export default function HomePage() {
         <Card className="p-6">
           <h2 className="font-medium">開始使用</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            可從上方「機構管理」維護機構清單。學員管理、題庫管理等功能將陸續上線。
+            可從上方「學員管理」維護學員名單、「機構管理」維護機構清單。題庫管理等功能將陸續上線。
           </p>
         </Card>
       )}

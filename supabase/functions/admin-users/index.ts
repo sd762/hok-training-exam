@@ -18,6 +18,15 @@ const WRITE_ROLES = new Set(['super_admin', 'platform_admin'])
 
 type Role = 'super_admin' | 'platform_admin' | 'viewer_admin' | 'institution_manager' | 'staff'
 
+interface StaffDetailInput {
+  name_native?: string | null
+  lang_code?: string
+  birth_date?: string | null // YYYY-MM-DD
+  hire_date: string // YYYY-MM-DD，學員必填
+  current_stage?: '1m' | '3m' | '1y' | null
+  department?: string | null
+}
+
 interface CreateAccountInput {
   account_code: string
   display_name: string
@@ -25,9 +34,18 @@ interface CreateAccountInput {
   institution_id?: number | null
   contact_email?: string | null
   password?: string // 未提供時使用預設密碼，要求登入後盡快由使用者自行更改
+  staff_detail?: StaffDetailInput // role = 'staff' 時必填
 }
 
 const DEFAULT_PASSWORD = '000000'
+
+// 瀏覽器呼叫前會先送 OPTIONS 預檢請求；沒有正確回應 CORS 標頭，
+// 瀏覽器會直接在網路層擋下正式請求，程式碼根本不會被執行到。
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
 function accountCodeToEmail(accountCode: string): string {
   return `${accountCode.trim().toLowerCase()}@${INTERNAL_DOMAIN}`
@@ -36,58 +54,69 @@ function accountCodeToEmail(accountCode: string): string {
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   })
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: CORS_HEADERS })
+  }
+
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return jsonResponse({ error: '缺少身分驗證' }, 401)
-  }
+  try {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return jsonResponse({ error: '缺少身分驗證' }, 401)
+    }
 
-  // 用呼叫者的 JWT 建立一個「以呼叫者身分」的 client，藉此安全地反查其角色。
-  const callerClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const {
-    data: { user: caller },
-  } = await callerClient.auth.getUser()
+    // 用呼叫者的 JWT 建立一個「以呼叫者身分」的 client，藉此安全地反查其角色。
+    const callerClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser()
 
-  if (!caller) {
-    return jsonResponse({ error: '身分驗證失敗' }, 401)
-  }
+    if (!caller) {
+      return jsonResponse({ error: '身分驗證失敗' }, 401)
+    }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-  const { data: callerProfile } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', caller.id)
-    .maybeSingle()
+    const { data: callerProfile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', caller.id)
+      .maybeSingle()
 
-  if (!callerProfile || !WRITE_ROLES.has(callerProfile.role)) {
-    return jsonResponse({ error: '權限不足：僅系統管理者/平台管理者可執行此操作' }, 403)
-  }
+    if (!callerProfile || !WRITE_ROLES.has(callerProfile.role)) {
+      return jsonResponse({ error: '權限不足：僅系統管理者/平台管理者可執行此操作' }, 403)
+    }
 
-  const body = await req.json().catch(() => null)
-  if (!body || typeof body.action !== 'string') {
-    return jsonResponse({ error: '請求格式錯誤' }, 400)
-  }
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body.action !== 'string') {
+      return jsonResponse({ error: '請求格式錯誤' }, 400)
+    }
 
-  switch (body.action) {
-    case 'create_account':
-      return await handleCreateAccount(admin, body.input as CreateAccountInput)
-    case 'bulk_import':
-      return await handleBulkImport(admin, body.rows as CreateAccountInput[])
-    case 'reset_password':
-      return await handleResetPassword(admin, body.account_code as string)
-    default:
-      return jsonResponse({ error: `未知操作：${body.action}` }, 400)
+    switch (body.action) {
+      case 'create_account':
+        return await handleCreateAccount(admin, body.input as CreateAccountInput)
+      case 'bulk_import':
+        return await handleBulkImport(admin, body.rows as CreateAccountInput[])
+      case 'reset_password':
+        return await handleResetPassword(admin, body.account_code as string)
+      case 'delete_account':
+        return await handleDeleteAccount(admin, body.account_code as string)
+      default:
+        return jsonResponse({ error: `未知操作：${body.action}` }, 400)
+    }
+  } catch (err) {
+    console.error('admin-users 未預期例外：', err)
+    return jsonResponse({ error: err instanceof Error ? err.message : '未預期的伺服器錯誤' }, 500)
   }
 })
 
@@ -149,11 +178,36 @@ async function handleResetPassword(admin: ReturnType<typeof createClient>, accou
   return jsonResponse({ ok: true, account_code: accountCode, new_password: DEFAULT_PASSWORD })
 }
 
-/** 依 account_code 是否已存在，建立新 Auth 使用者 + profiles，或更新既有 profiles 資料 */
+async function handleDeleteAccount(admin: ReturnType<typeof createClient>, accountCode: string) {
+  if (!accountCode) return jsonResponse({ error: '缺少帳號代碼' }, 400)
+
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id, is_active')
+    .eq('account_code', accountCode)
+    .maybeSingle()
+
+  if (!profile) return jsonResponse({ error: '找不到此帳號' }, 404)
+  if (profile.is_active) {
+    return jsonResponse({ error: '在職（啟用中）帳號無法刪除，請先停用' }, 400)
+  }
+
+  // 刪除 Auth 使用者會透過外鍵 on delete cascade 一併清除 profiles / staff_detail
+  const { error } = await admin.auth.admin.deleteUser(profile.id)
+  if (error) return jsonResponse({ error: error.message }, 400)
+
+  return jsonResponse({ ok: true, account_code: accountCode })
+}
+
+/** 依 account_code 是否已存在，建立新 Auth 使用者 + profiles（+ staff_detail），或更新既有資料 */
 async function createOrUpdateAccount(
   admin: ReturnType<typeof createClient>,
   input: CreateAccountInput,
 ): Promise<{ error?: string; created?: boolean }> {
+  if (input.role === 'staff' && !input.staff_detail?.hire_date) {
+    return { error: '學員帳號缺少到職日（staff_detail.hire_date）' }
+  }
+
   const { data: existing } = await admin
     .from('profiles')
     .select('id')
@@ -171,6 +225,13 @@ async function createOrUpdateAccount(
       })
       .eq('id', existing.id)
     if (error) return { error: error.message }
+
+    if (input.role === 'staff' && input.staff_detail) {
+      const { error: detailError } = await admin
+        .from('staff_detail')
+        .upsert({ profile_id: existing.id, ...input.staff_detail })
+      if (detailError) return { error: detailError.message }
+    }
     return { created: false }
   }
 
@@ -195,6 +256,18 @@ async function createOrUpdateAccount(
     // profiles 寫入失敗時，回滾已建立的 Auth 使用者，避免留下沒有角色資料的孤兒帳號
     await admin.auth.admin.deleteUser(created.user.id)
     return { error: profileError.message }
+  }
+
+  if (input.role === 'staff' && input.staff_detail) {
+    const { error: detailError } = await admin
+      .from('staff_detail')
+      .insert({ profile_id: created.user.id, ...input.staff_detail })
+    if (detailError) {
+      // 同樣回滾，避免留下沒有受訓資料的學員帳號
+      await admin.from('profiles').delete().eq('id', created.user.id)
+      await admin.auth.admin.deleteUser(created.user.id)
+      return { error: detailError.message }
+    }
   }
 
   return { created: true }
