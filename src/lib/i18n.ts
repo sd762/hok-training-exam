@@ -64,6 +64,16 @@ const dict = {
   result_passed: { 'zh-TW': '恭喜及格', vi: 'Chúc mừng, đạt', id: 'Selamat, Lulus' },
   result_failed: { 'zh-TW': '未達及格分數', vi: 'Chưa đạt điểm đậu', id: 'Belum Mencapai Nilai Kelulusan' },
   result_score: { 'zh-TW': '得分：{score} 分', vi: 'Điểm: {score}', id: 'Nilai: {score}' },
+  result_retry_hint: {
+    'zh-TW': '請重新進行第 {n} 次測驗',
+    vi: 'Vui lòng làm bài thi lần thứ {n}',
+    id: 'Silakan lakukan ujian ke-{n}',
+  },
+  result_locked_hint: {
+    'zh-TW': '已連續 3 次未通過，鎖定至 {date} 才能再次測驗',
+    vi: 'Đã thi trượt 3 lần liên tiếp, bị khóa đến {date} mới có thể thi lại',
+    id: 'Sudah gagal 3 kali berturut-turut, terkunci hingga {date} baru bisa ujian lagi',
+  },
   result_pending_review_note: {
     'zh-TW': '此次成績待管理者審核確認後正式生效',
     vi: 'Kết quả này sẽ chính thức có hiệu lực sau khi quản trị viên xác nhận',

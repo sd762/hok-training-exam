@@ -407,5 +407,8 @@ async function handleSubmit(
     })),
   )
 
-  return jsonResponse({ score, passed, status, questions })
+  // 不及格時，附上這次失敗後的重考次數/鎖定資訊，讓前端能提示「請重新進行第N次測驗」或鎖定日期
+  const retry = passed ? null : await getCycleStatus(admin, staffId, attempt.exam_def_id)
+
+  return jsonResponse({ score, passed, status, questions, retry })
 }

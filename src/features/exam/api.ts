@@ -43,11 +43,18 @@ export interface GradedQuestion extends QuestionView {
   is_correct: boolean
 }
 
+export interface RetryStatus {
+  attemptsLeft: number
+  lockedUntil: string | null
+  cycleAttemptNumber: number | null
+}
+
 export interface SubmitResult {
   score: number
   passed: boolean
   status: 'failed' | 'pending_review'
   questions: GradedQuestion[]
+  retry: RetryStatus | null
 }
 
 export async function fetchExamStatus(): Promise<ExamStatus> {

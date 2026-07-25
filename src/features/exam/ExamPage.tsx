@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useStudentLang } from './useStudentLang'
-import { startExam, submitExam, type GradedQuestion, type StartResult } from './api'
+import { startExam, submitExam, type StartResult, type SubmitResult } from './api'
 
 export default function ExamPage() {
   const { t } = useStudentLang()
@@ -16,7 +16,7 @@ export default function ExamPage() {
   const [session, setSession] = useState<StartResult | null>(null)
   const [answers, setAnswers] = useState<number[][]>([])
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState<{ score: number; passed: boolean; status: string; questions: GradedQuestion[] } | null>(null)
+  const [result, setResult] = useState<SubmitResult | null>(null)
 
   useEffect(() => {
     startExam()
@@ -28,6 +28,12 @@ export default function ExamPage() {
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 送出後畫面會切換到結果頁，但使用者當下多半捲到最後一題附近，
+  // 得分卡在最上方看不到，需要主動捲回頂端
+  useEffect(() => {
+    if (result) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [result])
 
   function toggleAnswer(qIndex: number, optionIndex: number, type: 'single' | 'multiple') {
     setAnswers((prev) =>
@@ -130,7 +136,7 @@ function ExamResult({
   t,
   onBack,
 }: {
-  result: { score: number; passed: boolean; status: string; questions: GradedQuestion[] }
+  result: SubmitResult
   t: ReturnType<typeof useStudentLang>['t']
   onBack: () => void
 }) {
@@ -144,6 +150,18 @@ function ExamResult({
         {result.status === 'pending_review' && (
           <p className="mt-3 text-sm text-status-pending">{t('result_pending_review_note')}</p>
         )}
+        {!result.passed && result.retry && (
+          <p className="mt-3 text-sm text-status-fail">
+            {result.retry.lockedUntil
+              ? t('result_locked_hint', { date: formatDate(result.retry.lockedUntil) })
+              : t('result_retry_hint', { n: result.retry.cycleAttemptNumber ?? '' })}
+          </p>
+        )}
+
+        {/* 送出後最先看到的就是分數，返回按鈕放在旁邊，不用捲到最底下才找得到 */}
+        <Button variant="outline" onClick={onBack} className="mt-5 w-full">
+          {t('result_back_to_status')}
+        </Button>
       </Card>
 
       {result.questions.map((q, i) => (
@@ -177,4 +195,8 @@ function ExamResult({
       </Button>
     </div>
   )
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString()
 }
