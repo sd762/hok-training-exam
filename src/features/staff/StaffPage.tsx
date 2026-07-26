@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Loader2, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, Loader2, Plus, Search, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { fetchCategories, fetchInstitutions } from '@/features/institutions/api'
 import type { Institution, InstitutionCategory } from '@/features/institutions/api'
 import {
@@ -31,6 +32,7 @@ export default function StaffPage() {
   const [importing, setImporting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [openInstitutions, setOpenInstitutions] = useState<Set<number | 'none'>>(new Set())
+  const [search, setSearch] = useState('')
 
   const reload = useCallback(async () => {
     setError(null)
@@ -54,17 +56,31 @@ export default function StaffPage() {
     void reload()
   }, [reload])
 
+  const searching = search.trim().length > 0
+
+  // 搜尋比對工號/姓名/母語姓名，不分大小寫；有搜尋字串時只留下有符合的機構資料夾，並自動展開
+  const visibleStaff = useMemo(() => {
+    if (!searching) return staff
+    const keyword = search.trim().toLowerCase()
+    return staff.filter(
+      (row) =>
+        row.account_code.toLowerCase().includes(keyword) ||
+        row.display_name.toLowerCase().includes(keyword) ||
+        (row.name_native ?? '').toLowerCase().includes(keyword),
+    )
+  }, [staff, search, searching])
+
   // 依機構分資料夾：機構管理者要在幾十位學員裡找人時，先展開自己負責的機構就好，不用整張表滑來滑去
   const staffByInstitution = useMemo(() => {
     const map = new Map<number | 'none', StaffRow[]>()
-    for (const row of staff) {
+    for (const row of visibleStaff) {
       const key = row.institution_id ?? 'none'
       const list = map.get(key) ?? []
       list.push(row)
       map.set(key, list)
     }
     return map
-  }, [staff])
+  }, [visibleStaff])
 
   const institutionsByCategory = useMemo(() => {
     const map = new Map<number, Institution[]>()
@@ -156,20 +172,36 @@ export default function StaffPage() {
         </Card>
       )}
 
+      <div className="relative max-w-sm">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" aria-hidden />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜尋工號／姓名／母語姓名"
+          className="pl-9"
+        />
+      </div>
+
+      {searching && visibleStaff.length === 0 && (
+        <p className="text-sm text-ink-muted">找不到符合「{search.trim()}」的學員</p>
+      )}
+
       <div className="space-y-6">
         {categories.map((category) => {
           const insts = institutionsByCategory.get(category.id) ?? []
           if (insts.length === 0) return null
+          const visibleInsts = searching ? insts.filter((inst) => (staffByInstitution.get(inst.id) ?? []).length > 0) : insts
+          if (visibleInsts.length === 0) return null
           return (
             <div key={category.id}>
               <h2 className="mb-2 text-sm font-semibold text-ink-muted">{category.name}</h2>
               <div className="space-y-2">
-                {insts.map((inst) => (
+                {visibleInsts.map((inst) => (
                   <InstitutionFolder
                     key={inst.id}
                     title={inst.name}
                     rows={staffByInstitution.get(inst.id) ?? []}
-                    open={openInstitutions.has(inst.id)}
+                    open={searching || openInstitutions.has(inst.id)}
                     onToggle={() => toggleInstitution(inst.id)}
                     onEdit={setEditing}
                     onResetPassword={handleResetPassword}
@@ -188,7 +220,7 @@ export default function StaffPage() {
             <InstitutionFolder
               title="未指定機構"
               rows={unassigned}
-              open={openInstitutions.has('none')}
+              open={searching || openInstitutions.has('none')}
               onToggle={() => toggleInstitution('none')}
               onEdit={setEditing}
               onResetPassword={handleResetPassword}
@@ -268,6 +300,9 @@ function InstitutionFolder({
                 <th className="px-4 py-2 font-medium">工號</th>
                 <th className="px-4 py-2 font-medium">姓名</th>
                 <th className="px-4 py-2 font-medium">國籍</th>
+                <th className="px-4 py-2 font-medium" title="用於國籍與年齡分布報表，沒填的話不會計入年齡分布統計">
+                  出生年月日
+                </th>
                 <th className="px-4 py-2 font-medium">到職日</th>
                 <th className="px-4 py-2 font-medium">已合格階段</th>
                 <th className="px-4 py-2 font-medium">狀態</th>
@@ -277,7 +312,7 @@ function InstitutionFolder({
             <tbody className="divide-y divide-line">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                  <td colSpan={8} className="px-4 py-6 text-center text-ink-muted">
                     這個機構還沒有學員
                   </td>
                 </tr>
@@ -287,6 +322,9 @@ function InstitutionFolder({
                   <td className="px-4 py-2">{row.account_code}</td>
                   <td className="px-4 py-2">{row.display_name}</td>
                   <td className="px-4 py-2">{LANG_LABELS[row.lang_code] ?? row.lang_code}</td>
+                  <td className="px-4 py-2">
+                    {row.birth_date ?? <span className="text-status-fail">未填</span>}
+                  </td>
                   <td className="px-4 py-2">{row.hire_date}</td>
                   <td className="px-4 py-2">
                     {row.current_stage ? STAGE_LABELS[row.current_stage] : '尚未設定'}

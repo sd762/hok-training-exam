@@ -61,7 +61,7 @@ export default function QuestionAccuracyTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 print:hidden">
         <Select value={examDefId} onChange={(e) => setExamDefId(Number(e.target.value))} className="max-w-xs">
           {examDefs.map((e) => (
             <option key={e.id} value={e.id}>
@@ -99,7 +99,7 @@ export default function QuestionAccuracyTab() {
             />
           </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-ink-muted">
               <tr>

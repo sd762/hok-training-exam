@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Printer } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
 import StaffSummaryTab from './StaffSummaryTab'
@@ -28,18 +29,30 @@ export default function ReportsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const currentTabLabel = TABS.find((t) => t.key === tab)?.label ?? ''
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">分析報表</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          每個分頁都可用「機構」「國籍」兩個篩選切換分析範圍：兩者都不篩＝全院總況；
-          留空其中一個＝跨機構或跨國籍比較；篩選其一＝單一機構或單一國籍的深入分析。
-          機構管理者只會看到自己機構的資料；只有「已確認通過」計入正式及格數字，待核對/存疑保留分開列出。
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">分析報表</h1>
+          <p className="mt-1 text-sm text-ink-muted print:hidden">
+            每個分頁都可用「機構」「國籍」兩個篩選切換分析範圍：兩者都不篩＝全院總況；
+            留空其中一個＝跨機構或跨國籍比較；篩選其一＝單一機構或單一國籍的深入分析。
+            機構管理者只會看到自己機構的資料；只有「已確認通過」計入正式及格數字，待核對/存疑保留分開列出。
+          </p>
+          {/* 列印時看不到分頁按鈕，用這行文字標示印的是哪個分頁 */}
+          <p className="mt-1 hidden text-sm text-ink-muted print:block">
+            {currentTabLabel}・列印時間：{new Date().toLocaleString('zh-TW')}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.print()} className="shrink-0 print:hidden">
+          <Printer className="size-4" aria-hidden />
+          列印報表
+        </Button>
       </div>
 
-      <div className="flex gap-1 border-b border-line">
+      <div className="flex gap-1 border-b border-line print:hidden">
         {TABS.map((t) => (
           <button
             key={t.key}

@@ -53,7 +53,7 @@ export default function AgeDistributionTab({ institutions }: { institutions: Ins
       <p className="text-xs text-ink-muted">
         僅計入在職且已填寫出生日期的學員。可分別篩選機構、國籍，觀察全院／單一機構的年齡分布，以及各國籍間的年齡差異。
       </p>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 print:hidden">
         <Select value={institutionId} onChange={(e) => setInstitutionId(e.target.value ? Number(e.target.value) : '')} className="max-w-xs">
           <option value="">全部機構（全院總況）</option>
           {institutions.map((i) => (
@@ -86,7 +86,7 @@ export default function AgeDistributionTab({ institutions }: { institutions: Ins
             <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" stacked />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-sm">
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>

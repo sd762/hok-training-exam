@@ -16,7 +16,18 @@ const INTERNAL_DOMAIN = 'hok-exam.local'
 
 const WRITE_ROLES = new Set(['super_admin', 'platform_admin'])
 
+// 建立/刪除/重設密碼這幾個操作，目標帳號若是「系統管理者/平台管理者/管理者」這三種
+// 全域角色，只有系統管理者本人能動；機構管理者跟學員則維持平台管理者也能操作（呼應
+// migration 0001 的 profiles_write RLS：role in ('institution_manager','staff') or super_admin）。
+// 這一層檢查不能只靠前端不顯示按鈕——呼叫者仍可直接打這支 Edge Function，必須在後端擋。
+const GLOBAL_ADMIN_ROLES = new Set(['super_admin', 'platform_admin', 'viewer_admin'])
+
 type Role = 'super_admin' | 'platform_admin' | 'viewer_admin' | 'institution_manager' | 'staff'
+
+function canManageTargetRole(callerRole: string, targetRole: string): boolean {
+  if (GLOBAL_ADMIN_ROLES.has(targetRole)) return callerRole === 'super_admin'
+  return true // institution_manager / staff：WRITE_ROLES 兩種角色都能管
+}
 
 interface StaffDetailInput {
   name_native?: string | null
@@ -102,15 +113,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: '請求格式錯誤' }, 400)
     }
 
+    const callerRole = callerProfile.role as string
+
     switch (body.action) {
       case 'create_account':
-        return await handleCreateAccount(admin, body.input as CreateAccountInput)
+        return await handleCreateAccount(admin, body.input as CreateAccountInput, callerRole)
       case 'bulk_import':
-        return await handleBulkImport(admin, body.rows as CreateAccountInput[])
+        return await handleBulkImport(admin, body.rows as CreateAccountInput[], callerRole)
       case 'reset_password':
-        return await handleResetPassword(admin, body.account_code as string)
+        return await handleResetPassword(admin, body.account_code as string, callerRole)
       case 'delete_account':
-        return await handleDeleteAccount(admin, body.account_code as string)
+        return await handleDeleteAccount(admin, body.account_code as string, callerRole)
       default:
         return jsonResponse({ error: `未知操作：${body.action}` }, 400)
     }
@@ -123,9 +136,13 @@ Deno.serve(async (req) => {
 async function handleCreateAccount(
   admin: ReturnType<typeof createClient>,
   input: CreateAccountInput,
+  callerRole: string,
 ) {
   if (!input?.account_code || !input.display_name || !input.role) {
     return jsonResponse({ error: '缺少必要欄位（account_code / display_name / role）' }, 400)
+  }
+  if (!canManageTargetRole(callerRole, input.role)) {
+    return jsonResponse({ error: '權限不足：只有系統管理者能建立/修改系統管理者、平台管理者、管理者帳號' }, 403)
   }
 
   const result = await createOrUpdateAccount(admin, input)
@@ -136,6 +153,7 @@ async function handleCreateAccount(
 async function handleBulkImport(
   admin: ReturnType<typeof createClient>,
   rows: CreateAccountInput[],
+  callerRole: string,
 ) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return jsonResponse({ error: '沒有可匯入的資料' }, 400)
@@ -148,7 +166,12 @@ async function handleBulkImport(
       results.push({ account_code: row?.account_code ?? '(空白)', status: 'error', message: '缺少工號或姓名' })
       continue
     }
-    const result = await createOrUpdateAccount(admin, { ...row, role: row.role ?? 'staff' })
+    const role = row.role ?? 'staff'
+    if (!canManageTargetRole(callerRole, role)) {
+      results.push({ account_code: row.account_code, status: 'error', message: '權限不足，無法建立此角色帳號' })
+      continue
+    }
+    const result = await createOrUpdateAccount(admin, { ...row, role })
     if (result.error) {
       results.push({ account_code: row.account_code, status: 'error', message: result.error })
     } else {
@@ -159,16 +182,19 @@ async function handleBulkImport(
   return jsonResponse({ ok: true, results })
 }
 
-async function handleResetPassword(admin: ReturnType<typeof createClient>, accountCode: string) {
+async function handleResetPassword(admin: ReturnType<typeof createClient>, accountCode: string, callerRole: string) {
   if (!accountCode) return jsonResponse({ error: '缺少帳號代碼' }, 400)
 
   const { data: profile } = await admin
     .from('profiles')
-    .select('id')
+    .select('id, role')
     .eq('account_code', accountCode)
     .maybeSingle()
 
   if (!profile) return jsonResponse({ error: '找不到此帳號' }, 404)
+  if (!canManageTargetRole(callerRole, profile.role)) {
+    return jsonResponse({ error: '權限不足：只有系統管理者能重設這個帳號的密碼' }, 403)
+  }
 
   const { error } = await admin.auth.admin.updateUserById(profile.id, {
     password: DEFAULT_PASSWORD,
@@ -178,16 +204,19 @@ async function handleResetPassword(admin: ReturnType<typeof createClient>, accou
   return jsonResponse({ ok: true, account_code: accountCode, new_password: DEFAULT_PASSWORD })
 }
 
-async function handleDeleteAccount(admin: ReturnType<typeof createClient>, accountCode: string) {
+async function handleDeleteAccount(admin: ReturnType<typeof createClient>, accountCode: string, callerRole: string) {
   if (!accountCode) return jsonResponse({ error: '缺少帳號代碼' }, 400)
 
   const { data: profile } = await admin
     .from('profiles')
-    .select('id, is_active')
+    .select('id, is_active, role')
     .eq('account_code', accountCode)
     .maybeSingle()
 
   if (!profile) return jsonResponse({ error: '找不到此帳號' }, 404)
+  if (!canManageTargetRole(callerRole, profile.role)) {
+    return jsonResponse({ error: '權限不足：只有系統管理者能刪除這個帳號' }, 403)
+  }
   if (profile.is_active) {
     return jsonResponse({ error: '在職（啟用中）帳號無法刪除，請先停用' }, 400)
   }

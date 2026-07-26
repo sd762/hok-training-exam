@@ -64,7 +64,7 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 print:hidden">
         <Select value={institutionId} onChange={(e) => setInstitutionId(e.target.value ? Number(e.target.value) : '')} className="max-w-xs">
           <option value="">全部機構（跨機構比較）</option>
           {institutions.map((i) => (
@@ -103,7 +103,7 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-sm">
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
