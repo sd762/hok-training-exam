@@ -42,8 +42,16 @@ export interface ExamResultRow {
   stage_code: string
   lang_code: string
   status: string
-  attempt_count: number
+  /** 這個狀態底下有幾「人」（同一人補考多次只算一次，取最終結果） */
+  staff_count: number
+  /** 這些人最終那次作答的平均分數 */
   avg_score: number | null
+  /** 這些人平均補考了幾次才落到目前狀態 */
+  avg_attempts: number | null
+  /** 同機構/階段/國籍底下，所有作答「人次」總數（含補考） */
+  total_attempts: number
+  /** 平均測考通過率——以「人次」計算，跟以「人」計算的正式及格率是兩回事，僅供參考 */
+  attempt_pass_rate: number | null
 }
 
 export interface ExamResultFilters {

@@ -83,7 +83,7 @@ export default function AgeDistributionTab({ institutions }: { institutions: Ins
         <>
           <div>
             <h3 className="mb-2 text-sm font-medium text-ink">年齡分布（共 {total} 人）</h3>
-            <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" />
+            <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" stacked />
           </div>
 
           <div className="overflow-x-auto">

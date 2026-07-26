@@ -4,6 +4,7 @@ import { Select } from '@/components/ui/Select'
 import type { Institution } from '@/features/institutions/api'
 import { fetchStaffSummary, type StaffSummaryRow } from './api'
 import { BarChart } from './BarChart'
+import { DonutChart } from './DonutChart'
 import { LANG_LABELS, LANG_SERIES } from './langSeries'
 
 export default function StaffSummaryTab({ institutions }: { institutions: Institution[] }) {
@@ -38,12 +39,27 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
       const gKey = String(r.institution_id ?? 'none')
       groupMap.set(gKey, r.institution_name ?? '(未指定機構)')
       values[gKey] ??= {}
-      values[gKey][r.lang_code] = (values[gKey][r.lang_code] ?? 0) + r.total_count
+      values[gKey][r.lang_code] = (values[gKey][r.lang_code] ?? 0) + r.active_count
     }
     const groups = [...groupMap.entries()].map(([key, label]) => ({ key, label }))
     const activeLangs = new Set(rows.map((r) => r.lang_code))
     const series = LANG_SERIES.filter((s) => activeLangs.has(s.key))
     return { groups, series, values }
+  }, [rows])
+
+  // 單一機構＝只有一個快照，用甜甜圈圖看國籍佔比最直觀；
+  // 跨機構比較則要能比較多個機構的大小，改用堆疊長條圖（見上）。
+  const donutSlices = useMemo(() => {
+    const totalsByLang = new Map<string, number>()
+    for (const r of rows) {
+      totalsByLang.set(r.lang_code, (totalsByLang.get(r.lang_code) ?? 0) + r.active_count)
+    }
+    return LANG_SERIES.filter((s) => (totalsByLang.get(s.key) ?? 0) > 0).map((s) => ({
+      key: s.key,
+      label: s.label,
+      value: totalsByLang.get(s.key) ?? 0,
+      color: s.color,
+    }))
   }, [rows])
 
   return (
@@ -77,8 +93,14 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
       ) : (
         <>
           <div>
-            <h3 className="mb-2 text-sm font-medium text-ink">在職人數——各機構國籍比例</h3>
-            <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" />
+            <h3 className="mb-2 text-sm font-medium text-ink">
+              在職人數——{institutionId ? '該機構國籍佔比' : '各機構國籍比例'}
+            </h3>
+            {institutionId ? (
+              <DonutChart slices={donutSlices} valueSuffix=" 人" centerLabel="在職人數" />
+            ) : (
+              <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" stacked />
+            )}
           </div>
 
           <div className="overflow-x-auto">
