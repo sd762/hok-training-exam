@@ -59,7 +59,12 @@ export function StaffImportModal({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-ink-muted">工號重複的資料會更新既有學員，不會重複建立。</p>
-          <Button type="button" size="sm" variant="outline" onClick={downloadStaffTemplate}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => downloadStaffTemplate(categories, institutions)}
+          >
             下載範本
           </Button>
         </div>

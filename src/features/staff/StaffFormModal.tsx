@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import type { Institution, InstitutionCategory } from '@/features/institutions/api'
-import { LANG_LABELS, STAGE_LABELS, type StaffFormInput, type StaffRow } from './api'
+import { DEPARTMENT_OPTIONS, LANG_LABELS, STAGE_LABELS, type StaffFormInput, type StaffRow } from './api'
 
 export function StaffFormModal({
   editing,
@@ -163,10 +163,17 @@ export function StaffFormModal({
         </Field>
 
         <Field label="部門（選填）">
-          <Input
+          <Select
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
-          />
+          >
+            <option value="">未指定</option>
+            {DEPARTMENT_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         {error && <p className="text-sm text-status-fail">{error}</p>}

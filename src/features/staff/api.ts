@@ -16,6 +16,9 @@ export const LANG_LABELS: Record<string, string> = {
   id: '印尼籍',
 }
 
+// 固定選項，對應公司實際的課別，不開放自由輸入以避免同一課別打成好幾種不同的寫法
+export const DEPARTMENT_OPTIONS = ['生福課', '行政一課', '行政二課', '人事課']
+
 export interface StaffRow {
   id: string
   account_code: string

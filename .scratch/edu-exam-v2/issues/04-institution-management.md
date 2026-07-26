@@ -14,3 +14,7 @@
       → 前端：導覽列項目依 `canWrite(role)` 過濾；後端：已用匿名 curl 實測寫入被 RLS 擋下（42501 + HTTP 401）
 - [x] 機構清單的讀取（例如給後續學員指派學員機構用的下拉選單）對所有已登入角色開放，但只有平台管理者/系統管理者能寫入
       → RLS 政策 `institution_read`／`institution_write` 已在工單 02 建立並沿用
+
+## 資料修正（2026-07-26，使用者發現）
+
+舊資料匯入時機構的 `category_id` 指錯類別——「1館/2館/3館」沒有掛在法人館底下、「清X」系列沒有掛在養護機構底下。用 `supabase/migrations/0013_fix_institution_categories.sql`（UPDATE 依機構名稱重新指定類別，非 schema 變更）修正，使用者已在 SQL Editor 執行。

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Institution, InstitutionCategory } from '@/features/institutions/api'
-import type { BulkImportRow, TrainingStage } from './api'
+import { DEPARTMENT_OPTIONS, type BulkImportRow, type TrainingStage } from './api'
 
 const STAGE_BY_LABEL: Record<string, TrainingStage> = {
   滿1個月: '1m',
@@ -11,10 +11,14 @@ const STAGE_BY_LABEL: Record<string, TrainingStage> = {
   滿一年: '1y',
 }
 
+// 國籍稱呼為主，語言名稱是舊範本用詞，保留相容避免舊檔案匯入失敗
 const LANG_BY_LABEL: Record<string, string> = {
+  台籍: 'zh-TW',
   繁體中文: 'zh-TW',
   中文: 'zh-TW',
+  越南籍: 'vi',
   越南文: 'vi',
+  印尼籍: 'id',
   印尼文: 'id',
 }
 
@@ -53,7 +57,8 @@ export async function parseStaffExcel(
     const hireDateRaw = line['到職日']
     const birthDateRaw = line['出生年月日']
     const stageLabel = String(line['已合格階段'] ?? '').trim()
-    const langLabel = String(line['國籍'] ?? '繁體中文').trim()
+    const langLabel = String(line['國籍'] ?? '台籍').trim()
+    const department = String(line['部門'] ?? '').trim()
 
     if (!accountCode || !displayName) {
       errors.push({ rowNumber, message: '缺少工號或姓名' })
@@ -91,6 +96,14 @@ export async function parseStaffExcel(
       return
     }
 
+    if (department && !DEPARTMENT_OPTIONS.includes(department)) {
+      errors.push({
+        rowNumber,
+        message: `部門「${department}」不是允許的選項（${DEPARTMENT_OPTIONS.join('／')}）`,
+      })
+      return
+    }
+
     const langCode = LANG_BY_LABEL[langLabel] ?? langLabel
 
     rows.push({
@@ -103,7 +116,7 @@ export async function parseStaffExcel(
       birth_date: birthDate ?? undefined,
       hire_date: hireDate,
       current_stage: stage,
-      department: String(line['部門'] ?? '').trim() || undefined,
+      department: department || undefined,
     })
   })
 
@@ -123,15 +136,40 @@ function normalizeDate(value: unknown): string | null {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
-export function downloadStaffTemplate() {
+const NATIONALITY_OPTIONS = ['台籍', '越南籍', '印尼籍']
+
+// 目前使用的 xlsx 套件（免費版 SheetJS）不支援寫入 Excel 原生的下拉選單資料驗證，
+// 只能改用「對照表」這個折衷做法：把目前系統裡實際有效的機構/國籍/部門/階段列在
+// 第二個工作表，讓填表的人直接複製正確寫法貼過去，減少手打錯字造成匯入失敗。
+export function downloadStaffTemplate(categories: InstitutionCategory[], institutions: Institution[]) {
   const headers = [
     '工號', '姓名', '母語姓名', '國籍', '出生年月日', '到職日', '已合格階段', '機構類別', '機構名稱', '部門',
   ]
   const example = [
-    'T0001', '王小明', '', '繁體中文', '1990-05-20', '2026-01-18', '滿1個月', '養護機構', '清安', '',
+    'T0001', '王小明', '', '台籍', '1990-05-20', '2026-01-18', '滿1個月', '養護機構', '清安', '',
   ]
   const sheet = XLSX.utils.aoa_to_sheet([headers, example])
+  sheet['!cols'] = headers.map(() => ({ wch: 12 }))
+
+  const categoryById = new Map(categories.map((c) => [c.id, c]))
+  const institutionRows = institutions
+    .filter((i) => i.is_active)
+    .map((i) => [categoryById.get(i.category_id)?.name ?? '', i.name])
+
+  const refRows: (string | undefined)[][] = [
+    ['請填寫的值', '說明／可用選項'],
+    ['國籍', NATIONALITY_OPTIONS.join('／')],
+    ['已合格階段', '空白（尚未設定）／滿1個月／滿3個月／滿1年'],
+    ['部門（選填）', DEPARTMENT_OPTIONS.join('／')],
+    [],
+    ['機構類別', '機構名稱（下面兩欄請照抄，不要自己改字）'],
+    ...institutionRows,
+  ]
+  const refSheet = XLSX.utils.aoa_to_sheet(refRows)
+  refSheet['!cols'] = [{ wch: 16 }, { wch: 30 }]
+
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, '學員名單')
+  XLSX.utils.book_append_sheet(workbook, refSheet, '可用選項對照表')
   XLSX.writeFile(workbook, '學員批次匯入範本.xlsx')
 }
