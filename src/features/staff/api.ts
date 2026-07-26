@@ -92,8 +92,10 @@ interface RawStaffRow {
   } | null
 }
 
-export async function createOrUpdateStaff(input: StaffFormInput): Promise<void> {
-  await callAdminUsers({
+export async function createOrUpdateStaff(
+  input: StaffFormInput,
+): Promise<{ created: boolean; password?: string }> {
+  return callAdminUsers({
     action: 'create_account',
     input: {
       account_code: input.account_code,

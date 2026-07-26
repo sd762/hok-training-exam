@@ -237,7 +237,10 @@ export default function StaffPage() {
           categories={categories}
           institutions={institutions}
           onSubmit={async (input) => {
-            await createOrUpdateStaff(input)
+            const result = await createOrUpdateStaff(input)
+            if (result.created && result.password) {
+              setNotice(`${input.display_name}（${input.account_code}）已建立，預設密碼：${result.password}，請提醒對方登入後盡快修改`)
+            }
             await reload()
           }}
           onClose={() => setEditing(null)}

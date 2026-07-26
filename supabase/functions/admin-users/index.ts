@@ -147,7 +147,13 @@ async function handleCreateAccount(
 
   const result = await createOrUpdateAccount(admin, input)
   if (result.error) return jsonResponse({ error: result.error }, 400)
-  return jsonResponse({ ok: true, account_code: input.account_code, created: result.created })
+  return jsonResponse({
+    ok: true,
+    account_code: input.account_code,
+    created: result.created,
+    // 新建立的帳號才有密碼可回報；更新既有帳號不會動到密碼，不回傳
+    password: result.created ? (input.password ?? DEFAULT_PASSWORD) : undefined,
+  })
 }
 
 async function handleBulkImport(

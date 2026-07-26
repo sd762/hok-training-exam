@@ -196,7 +196,10 @@ export default function AdminsPage() {
           categories={categories}
           institutions={institutions}
           onSubmit={async (input) => {
-            await createOrUpdateAdmin(input)
+            const result = await createOrUpdateAdmin(input)
+            if (result.created && result.password) {
+              setNotice(`${input.display_name}（${input.account_code}）已建立，預設密碼：${result.password}，請提醒對方登入後盡快修改`)
+            }
             await reload()
           }}
           onClose={() => setEditing(null)}

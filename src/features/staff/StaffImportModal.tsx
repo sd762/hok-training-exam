@@ -58,7 +58,9 @@ export function StaffImportModal({
     <Modal title="批次匯入學員" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-ink-muted">工號重複的資料會更新既有學員，不會重複建立。</p>
+          <p className="text-sm text-ink-muted">
+            工號重複的資料會更新既有學員，不會重複建立。新建立的帳號預設密碼一律是「000000」，請提醒學員登入後盡快修改。
+          </p>
           <Button
             type="button"
             size="sm"

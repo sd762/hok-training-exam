@@ -60,8 +60,10 @@ export async function fetchAdmins(): Promise<AdminRow[]> {
   }))
 }
 
-export async function createOrUpdateAdmin(input: AdminFormInput): Promise<void> {
-  await callAdminUsers({
+export async function createOrUpdateAdmin(
+  input: AdminFormInput,
+): Promise<{ created: boolean; password?: string }> {
+  return callAdminUsers({
     action: 'create_account',
     input: {
       account_code: input.account_code,
