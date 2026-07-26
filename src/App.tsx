@@ -4,7 +4,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { useAuth } from '@/auth/useAuth'
 import { AppShell } from '@/components/AppShell'
-import { canWrite } from '@/lib/roles'
+import { canViewReports, canWrite } from '@/lib/roles'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
@@ -12,6 +12,7 @@ import StaffPage from '@/features/staff/StaffPage'
 import QuestionsPage from '@/features/questions/QuestionsPage'
 import ReviewPage from '@/features/review/ReviewPage'
 import NotificationsPage from '@/features/notifications/NotificationsPage'
+import ReportsPage from '@/features/reports/ReportsPage'
 
 // 監考用的 @mediapipe/tasks-vision 體積不小，只有學員進考試畫面才需要，延後載入
 const ExamPage = lazy(() => import('@/features/exam/ExamPage'))
@@ -41,11 +42,13 @@ function AppRoutes() {
   if (!profile) return <LoginPage />
 
   const writable = canWrite(profile.role)
+  const canReport = canViewReports(profile.role)
 
   return (
     <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        {canReport && <Route path="/reports" element={<ReportsPage />} />}
         {writable && <Route path="/review" element={<ReviewPage />} />}
         {writable && <Route path="/notifications" element={<NotificationsPage />} />}
         {writable && <Route path="/institutions" element={<InstitutionsPage />} />}

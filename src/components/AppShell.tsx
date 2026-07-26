@@ -1,7 +1,7 @@
 import { GraduationCap, LogOut } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/auth/useAuth'
-import { ROLE_LABELS, canWrite, type UserRole } from '@/lib/roles'
+import { ROLE_LABELS, canViewReports, canWrite, type UserRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -12,6 +12,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { to: '/reports', label: '分析報表', visibleTo: canViewReports },
   { to: '/review', label: '審查', visibleTo: canWrite },
   { to: '/staff', label: '學員管理', visibleTo: canWrite },
   { to: '/questions', label: '題庫管理', visibleTo: canWrite },

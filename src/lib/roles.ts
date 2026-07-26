@@ -38,3 +38,8 @@ export function canWrite(role: UserRole): boolean {
 export function canReviewAttempts(role: UserRole): boolean {
   return role === 'super_admin' || role === 'platform_admin'
 }
+
+/** 可查看分析報表的角色——除了學員以外全部角色都能看，範圍由 RLS 自動限縮（工單12） */
+export function canViewReports(role: UserRole): boolean {
+  return role !== 'staff'
+}
