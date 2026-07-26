@@ -129,7 +129,23 @@ export default function ExamPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-24">
-      <div className="sticky top-0 z-10 -mx-6 border-b border-line bg-surface-muted px-6 py-3">
+      <div className="sticky top-0 z-10 -mx-6 flex items-center gap-3 border-b border-line bg-surface-muted px-6 py-3">
+        {/* 監考鏡頭預覽：放在頂端進度列的左側，符合實際應考時視角習慣（鏡頭本來就在螢幕上方），
+            且跟著這條 sticky 列一起固定，不需要另外計算高度避免疊到標題文字 */}
+        <div className="relative shrink-0 overflow-hidden rounded-lg border-2 border-line shadow-sm">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="h-12 w-16 bg-ink object-cover sm:h-14 sm:w-20"
+          />
+          {showFaceWarning && (
+            <div className="absolute inset-0 flex items-center justify-center bg-status-fail/80 p-1 text-center text-[9px] text-white sm:text-[10px]">
+              {t('face_missing_warning')}
+            </div>
+          )}
+        </div>
         <p className="text-sm font-medium">
           {session.exam.title} · {answeredCount}/{session.questions.length}
         </p>
@@ -140,23 +156,6 @@ export default function ExamPage() {
           {t('tab_switch_warning')}
         </div>
       )}
-
-      {/* 監考鏡頭預覽：固定在角落，讓學員知道鏡頭正在運作中。
-          手機螢幕較小，縮小尺寸；下方內容留白（pb-28）避免被這個固定元素蓋住送出按鈕 */}
-      <div className="fixed bottom-4 right-4 z-20 overflow-hidden rounded-lg border-2 border-line shadow-lg">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="h-16 w-20 bg-ink object-cover sm:h-24 sm:w-32"
-        />
-        {showFaceWarning && (
-          <div className="absolute inset-0 flex items-center justify-center bg-status-fail/80 p-1 text-center text-[10px] text-white sm:text-xs">
-            {t('face_missing_warning')}
-          </div>
-        )}
-      </div>
 
       {session.questions.map((q, qIndex) => (
         <Card key={q.question_id} className="p-5">

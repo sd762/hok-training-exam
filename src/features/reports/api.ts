@@ -9,9 +9,10 @@ export interface StaffSummaryRow {
   avg_age: number | null
 }
 
-export async function fetchStaffSummary(institutionId?: number): Promise<StaffSummaryRow[]> {
+export async function fetchStaffSummary(institutionId?: number, langCode?: string): Promise<StaffSummaryRow[]> {
   const { data, error } = await supabase.rpc('report_staff_summary', {
     p_institution_id: institutionId ?? null,
+    p_lang_code: langCode ?? null,
   })
   if (error) throw error
   return data
@@ -51,6 +52,7 @@ export interface ExamResultFilters {
   half?: 1 | 2
   quarter?: 1 | 2 | 3 | 4
   stageCode?: '1m' | '3m' | '1y'
+  langCode?: string
 }
 
 export async function fetchExamResults(filters: ExamResultFilters): Promise<ExamResultRow[]> {
@@ -60,22 +62,22 @@ export async function fetchExamResults(filters: ExamResultFilters): Promise<Exam
     p_half: filters.half ?? null,
     p_quarter: filters.quarter ?? null,
     p_stage_code: filters.stageCode ?? null,
+    p_lang_code: filters.langCode ?? null,
   })
   if (error) throw error
   return data
 }
 
-export interface RetentionRow {
-  institution_id: number | null
-  institution_name: string | null
-  active_count: number
-  inactive_count: number
-  avg_tenure_days: number | null
+export interface AgeDistributionRow {
+  lang_code: string
+  age_bucket: string
+  count: number
 }
 
-export async function fetchRetention(institutionId?: number): Promise<RetentionRow[]> {
-  const { data, error } = await supabase.rpc('report_retention', {
+export async function fetchAgeDistribution(institutionId?: number, langCode?: string): Promise<AgeDistributionRow[]> {
+  const { data, error } = await supabase.rpc('report_age_distribution', {
     p_institution_id: institutionId ?? null,
+    p_lang_code: langCode ?? null,
   })
   if (error) throw error
   return data

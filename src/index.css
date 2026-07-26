@@ -34,6 +34,18 @@
   --color-ink-muted: #64748b;
   --color-line: #e2e8f0;
 
+  /*
+   * 報表圖表用的類別色（國籍/語言別等身分識別，非狀態）。
+   * 取自 dataviz 技能的驗證色票，固定順序不可循環替換，經
+   * validate_palette.js 驗證過色盲安全性（淺色模式全通過，
+   * 第3色 aqua 對比度略低於3:1，已用直接文字標籤緩解）。
+   * 與上面的 status-* 分開，不共用色票，避免「這是哪個國籍」
+   * 跟「這是及格/不及格」兩種語意混淆。
+   */
+  --color-chart-1: #2a78d6; /* 繁體中文 */
+  --color-chart-2: #eb6834; /* 越南文 */
+  --color-chart-3: #1baf7a; /* 印尼文 */
+
   --font-sans: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui,
     sans-serif;
 }

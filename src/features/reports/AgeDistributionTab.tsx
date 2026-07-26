@@ -2,14 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
 import type { Institution } from '@/features/institutions/api'
-import { fetchStaffSummary, type StaffSummaryRow } from './api'
+import { fetchAgeDistribution, type AgeDistributionRow } from './api'
 import { BarChart } from './BarChart'
 import { LANG_LABELS, LANG_SERIES } from './langSeries'
 
-export default function StaffSummaryTab({ institutions }: { institutions: Institution[] }) {
+const AGE_BUCKET_ORDER = ['20-29', '30-39', '40-49', '50-59', '60+']
+
+export default function AgeDistributionTab({ institutions }: { institutions: Institution[] }) {
   const [institutionId, setInstitutionId] = useState<number | ''>('')
   const [langCode, setLangCode] = useState('')
-  const [rows, setRows] = useState<StaffSummaryRow[]>([])
+  const [rows, setRows] = useState<AgeDistributionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -17,7 +19,7 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
     setLoading(true)
     setError(null)
     try {
-      setRows(await fetchStaffSummary(institutionId || undefined, langCode || undefined))
+      setRows(await fetchAgeDistribution(institutionId || undefined, langCode || undefined))
     } catch (err) {
       setError(err instanceof Error ? err.message : '讀取失敗')
     } finally {
@@ -29,28 +31,31 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
     void reload()
   }, [reload])
 
-  // 未篩選機構＝跨機構比較（全院總況）；篩選機構＝單一機構深入。
-  // 未篩選國籍＝跨國籍比較；篩選國籍＝單一國籍深入。兩個篩選可任意組合。
+  // 未篩選機構＝全院/跨機構總況；篩選機構＝單一機構深入。
+  // 未篩選國籍＝跨國籍比較；篩選國籍＝單一國籍深入。年齡分組固定順序當 x 軸，國籍固定色當系列。
   const chart = useMemo(() => {
-    const groupMap = new Map<string, string>()
+    const groups = AGE_BUCKET_ORDER.map((b) => ({ key: b, label: b }))
     const values: Record<string, Record<string, number>> = {}
+    for (const b of AGE_BUCKET_ORDER) values[b] = {}
     for (const r of rows) {
-      const gKey = String(r.institution_id ?? 'none')
-      groupMap.set(gKey, r.institution_name ?? '(未指定機構)')
-      values[gKey] ??= {}
-      values[gKey][r.lang_code] = (values[gKey][r.lang_code] ?? 0) + r.total_count
+      values[r.age_bucket] ??= {}
+      values[r.age_bucket][r.lang_code] = (values[r.age_bucket][r.lang_code] ?? 0) + r.count
     }
-    const groups = [...groupMap.entries()].map(([key, label]) => ({ key, label }))
     const activeLangs = new Set(rows.map((r) => r.lang_code))
     const series = LANG_SERIES.filter((s) => activeLangs.has(s.key))
     return { groups, series, values }
   }, [rows])
 
+  const total = rows.reduce((sum, r) => sum + r.count, 0)
+
   return (
     <div className="space-y-4">
+      <p className="text-xs text-ink-muted">
+        僅計入在職且已填寫出生日期的學員。可分別篩選機構、國籍，觀察全院／單一機構的年齡分布，以及各國籍間的年齡差異。
+      </p>
       <div className="flex flex-wrap gap-3">
         <Select value={institutionId} onChange={(e) => setInstitutionId(e.target.value ? Number(e.target.value) : '')} className="max-w-xs">
-          <option value="">全部機構（跨機構比較）</option>
+          <option value="">全部機構（全院總況）</option>
           {institutions.map((i) => (
             <option key={i.id} value={i.id}>
               {i.name}
@@ -77,7 +82,7 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
       ) : (
         <>
           <div>
-            <h3 className="mb-2 text-sm font-medium text-ink">在職人數——各機構國籍比例</h3>
+            <h3 className="mb-2 text-sm font-medium text-ink">年齡分布（共 {total} 人）</h3>
             <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix=" 人" />
           </div>
 
@@ -85,28 +90,24 @@ export default function StaffSummaryTab({ institutions }: { institutions: Instit
             <table className="w-full text-sm">
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
-                  <th className="px-3 py-2 font-medium">機構</th>
+                  <th className="px-3 py-2 font-medium">年齡區間</th>
                   <th className="px-3 py-2 font-medium">國籍</th>
-                  <th className="px-3 py-2 font-medium">總人數</th>
-                  <th className="px-3 py-2 font-medium">在職人數</th>
-                  <th className="px-3 py-2 font-medium">平均年齡</th>
+                  <th className="px-3 py-2 font-medium">人數</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-ink-muted">
+                    <td colSpan={3} className="px-3 py-6 text-center text-ink-muted">
                       無資料
                     </td>
                   </tr>
                 )}
                 {rows.map((r, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2">{r.institution_name ?? '(未指定)'}</td>
+                    <td className="px-3 py-2">{r.age_bucket}</td>
                     <td className="px-3 py-2">{LANG_LABELS[r.lang_code] ?? r.lang_code}</td>
-                    <td className="px-3 py-2">{r.total_count}</td>
-                    <td className="px-3 py-2">{r.active_count}</td>
-                    <td className="px-3 py-2">{r.avg_age ?? '-'}</td>
+                    <td className="px-3 py-2">{r.count}</td>
                   </tr>
                 ))}
               </tbody>

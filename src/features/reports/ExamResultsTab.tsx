@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
 import type { Institution } from '@/features/institutions/api'
 import { fetchExamResults, type ExamResultRow } from './api'
+import { BarChart } from './BarChart'
+import { LANG_SERIES } from './langSeries'
 
 const STAGE_LABELS: Record<string, string> = { '1m': '到職滿1個月', '3m': '到職滿3個月', '1y': '到職滿1年' }
 const LANG_LABELS: Record<string, string> = { 'zh-TW': '繁體中文', vi: '越南文', id: '印尼文' }
@@ -31,6 +33,7 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
   const [half, setHalf] = useState<'' | 1 | 2>('')
   const [quarter, setQuarter] = useState<'' | 1 | 2 | 3 | 4>('')
   const [stageCode, setStageCode] = useState<'' | '1m' | '3m' | '1y'>('')
+  const [langCode, setLangCode] = useState('')
   const [rows, setRows] = useState<ExamResultRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +49,7 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
           half: half || undefined,
           quarter: quarter || undefined,
           stageCode: stageCode || undefined,
+          langCode: langCode || undefined,
         }),
       )
     } catch (err) {
@@ -53,20 +57,58 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
     } finally {
       setLoading(false)
     }
-  }, [institutionId, year, half, quarter, stageCode])
+  }, [institutionId, year, half, quarter, stageCode, langCode])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
+  // 及格率＝已確認通過筆數 / 全部筆數，依機構分組、依國籍上色。
+  const chart = useMemo(() => {
+    const groupMap = new Map<string, string>()
+    const totals: Record<string, Record<string, number>> = {}
+    const passed: Record<string, Record<string, number>> = {}
+    for (const r of rows) {
+      const gKey = String(r.institution_id ?? 'none')
+      groupMap.set(gKey, r.institution_name ?? '(未指定機構)')
+      totals[gKey] ??= {}
+      passed[gKey] ??= {}
+      totals[gKey][r.lang_code] = (totals[gKey][r.lang_code] ?? 0) + r.attempt_count
+      if (r.status === 'confirmed_passed') {
+        passed[gKey][r.lang_code] = (passed[gKey][r.lang_code] ?? 0) + r.attempt_count
+      }
+    }
+    const groups = [...groupMap.entries()].map(([key, label]) => ({ key, label }))
+    const activeLangs = new Set(rows.map((r) => r.lang_code))
+    const series = LANG_SERIES.filter((s) => activeLangs.has(s.key))
+    const values: Record<string, Record<string, number>> = {}
+    for (const gKey of groupMap.keys()) {
+      values[gKey] = {}
+      for (const s of series) {
+        const total = totals[gKey]?.[s.key] ?? 0
+        const pass = passed[gKey]?.[s.key] ?? 0
+        values[gKey][s.key] = total > 0 ? Math.round((pass / total) * 100) : 0
+      }
+    }
+    return { groups, series, values }
+  }, [rows])
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
         <Select value={institutionId} onChange={(e) => setInstitutionId(e.target.value ? Number(e.target.value) : '')} className="max-w-xs">
-          <option value="">全部機構</option>
+          <option value="">全部機構（跨機構比較）</option>
           {institutions.map((i) => (
             <option key={i.id} value={i.id}>
               {i.name}
+            </option>
+          ))}
+        </Select>
+        <Select value={langCode} onChange={(e) => setLangCode(e.target.value)} className="max-w-xs">
+          <option value="">全部國籍（跨國籍比較）</option>
+          {LANG_SERIES.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
             </option>
           ))}
         </Select>
@@ -110,41 +152,48 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
           載入中…
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-line text-left text-ink-muted">
-              <tr>
-                <th className="px-3 py-2 font-medium">機構</th>
-                <th className="px-3 py-2 font-medium">階段</th>
-                <th className="px-3 py-2 font-medium">語言</th>
-                <th className="px-3 py-2 font-medium">狀態</th>
-                <th className="px-3 py-2 font-medium">筆數</th>
-                <th className="px-3 py-2 font-medium">平均分數</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.length === 0 && (
+        <>
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-ink">及格率（已確認通過）——各機構國籍比較</h3>
+            <BarChart groups={chart.groups} series={chart.series} values={chart.values} valueSuffix="%" maxValue={100} />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-ink-muted">
-                    無資料
-                  </td>
+                  <th className="px-3 py-2 font-medium">機構</th>
+                  <th className="px-3 py-2 font-medium">階段</th>
+                  <th className="px-3 py-2 font-medium">語言</th>
+                  <th className="px-3 py-2 font-medium">狀態</th>
+                  <th className="px-3 py-2 font-medium">筆數</th>
+                  <th className="px-3 py-2 font-medium">平均分數</th>
                 </tr>
-              )}
-              {rows.map((r, i) => (
-                <tr key={i}>
-                  <td className="px-3 py-2">{r.institution_name ?? '(未指定)'}</td>
-                  <td className="px-3 py-2">{STAGE_LABELS[r.stage_code] ?? r.stage_code}</td>
-                  <td className="px-3 py-2">{LANG_LABELS[r.lang_code] ?? r.lang_code}</td>
-                  <td className={`px-3 py-2 font-medium ${STATUS_COLORS[r.status] ?? ''}`}>
-                    {STATUS_LABELS[r.status] ?? r.status}
-                  </td>
-                  <td className="px-3 py-2">{r.attempt_count}</td>
-                  <td className="px-3 py-2">{r.avg_score ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-ink-muted">
+                      無資料
+                    </td>
+                  </tr>
+                )}
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">{r.institution_name ?? '(未指定)'}</td>
+                    <td className="px-3 py-2">{STAGE_LABELS[r.stage_code] ?? r.stage_code}</td>
+                    <td className="px-3 py-2">{LANG_LABELS[r.lang_code] ?? r.lang_code}</td>
+                    <td className={`px-3 py-2 font-medium ${STATUS_COLORS[r.status] ?? ''}`}>
+                      {STATUS_LABELS[r.status] ?? r.status}
+                    </td>
+                    <td className="px-3 py-2">{r.attempt_count}</td>
+                    <td className="px-3 py-2">{r.avg_score ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
