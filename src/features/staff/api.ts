@@ -9,10 +9,11 @@ export const STAGE_LABELS: Record<TrainingStage, string> = {
   '1y': '到職滿1年',
 }
 
+// 這裡的欄位標題是「國籍」，顯示文字也要對應國籍稱呼，不是語言名稱
 export const LANG_LABELS: Record<string, string> = {
-  'zh-TW': '繁體中文',
-  vi: '越南文',
-  id: '印尼文',
+  'zh-TW': '台籍',
+  vi: '越南籍',
+  id: '印尼籍',
 }
 
 export interface StaffRow {

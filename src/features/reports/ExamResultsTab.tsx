@@ -5,24 +5,7 @@ import type { Institution } from '@/features/institutions/api'
 import { fetchExamResults, type ExamResultRow } from './api'
 import { BarChart, type BarSeries } from './BarChart'
 import { DonutChart } from './DonutChart'
-import { LANG_LABELS, LANG_SERIES } from './langSeries'
-
-const STAGE_LABELS: Record<string, string> = { '1m': '到職滿1個月', '3m': '到職滿3個月', '1y': '到職滿1年' }
-
-const STATUS_LABELS: Record<string, string> = {
-  confirmed_passed: '已確認通過',
-  pending_review: '待核對',
-  flagged: '存疑保留',
-  failed: '不及格',
-  voided: '已作廢',
-}
-const STATUS_COLORS: Record<string, string> = {
-  confirmed_passed: 'text-status-pass',
-  pending_review: 'text-status-pending',
-  flagged: 'text-status-flagged',
-  failed: 'text-status-fail',
-  voided: 'text-ink-muted',
-}
+import { LANG_SERIES } from './langSeries'
 
 // 這裡用的是「狀態色」而不是國籍色——這張圖分析的是及格/不及格的組成，
 // 顏色代表的是結果狀態，跟其他分頁用國籍上色的圖表是不同的語意，不能混用同一組色票。
@@ -109,6 +92,51 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
     ]
   }, [rows])
 
+  // 表格收斂成跟圖表一樣的粒度——一個機構一列，不再依階段/國籍/狀態展開，
+  // 否則機構一多、表格會變得又長又重複（圖表已經看得出比例，表格只補精確數字）。
+  // 要看特定階段/國籍的細節，用上面的篩選縮小範圍即可，不需要在表格裡全部攤開。
+  const summaryRows = useMemo(() => {
+    const byInstitution = new Map<
+      string,
+      { institutionName: string; total: number; passed: number; failed: number; other: number; scoreSum: number; scoreWeight: number }
+    >()
+    for (const r of rows) {
+      const key = String(r.institution_id ?? 'none')
+      const acc = byInstitution.get(key) ?? {
+        institutionName: r.institution_name ?? '(未指定)',
+        total: 0,
+        passed: 0,
+        failed: 0,
+        other: 0,
+        scoreSum: 0,
+        scoreWeight: 0,
+      }
+      acc.total += r.staff_count
+      if (r.status === 'confirmed_passed') {
+        acc.passed += r.staff_count
+        if (r.avg_score != null) {
+          acc.scoreSum += r.avg_score * r.staff_count
+          acc.scoreWeight += r.staff_count
+        }
+      } else if (r.status === 'failed') {
+        acc.failed += r.staff_count
+      } else {
+        acc.other += r.staff_count
+      }
+      byInstitution.set(key, acc)
+    }
+    return [...byInstitution.entries()].map(([key, acc]) => ({
+      key,
+      institutionName: acc.institutionName,
+      total: acc.total,
+      passed: acc.passed,
+      failed: acc.failed,
+      other: acc.other,
+      passRate: acc.total > 0 ? Math.round((acc.passed / acc.total) * 100) : null,
+      avgScorePassed: acc.scoreWeight > 0 ? Math.round((acc.scoreSum / acc.scoreWeight) * 10) / 10 : null,
+    }))
+  }, [rows])
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
@@ -192,44 +220,40 @@ export default function ExamResultsTab({ institutions }: { institutions: Institu
               <thead className="border-b border-line text-left text-ink-muted">
                 <tr>
                   <th className="px-3 py-2 font-medium">機構</th>
-                  <th className="px-3 py-2 font-medium">階段</th>
-                  <th className="px-3 py-2 font-medium">國籍</th>
-                  <th className="px-3 py-2 font-medium">狀態</th>
                   <th className="px-3 py-2 font-medium">人數</th>
-                  <th className="px-3 py-2 font-medium">平均分數</th>
-                  <th className="px-3 py-2 font-medium">平均嘗試次數</th>
-                  <th className="px-3 py-2 font-medium" title="以「人次」計算的通過率，僅供參考，不是正式及格率">
-                    平均測考通過率（人次）
+                  <th className="px-3 py-2 font-medium text-status-pass">已確認通過</th>
+                  <th className="px-3 py-2 font-medium text-status-fail">不及格</th>
+                  <th className="px-3 py-2 font-medium" title="待核對/存疑保留/已作廢，尚無最終結果">
+                    其他
                   </th>
+                  <th className="px-3 py-2 font-medium">及格率（人）</th>
+                  <th className="px-3 py-2 font-medium">平均分數（通過者）</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {rows.length === 0 && (
+                {summaryRows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-ink-muted">
+                    <td colSpan={7} className="px-3 py-6 text-center text-ink-muted">
                       無資料
                     </td>
                   </tr>
                 )}
-                {rows.map((r, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">{r.institution_name ?? '(未指定)'}</td>
-                    <td className="px-3 py-2">{STAGE_LABELS[r.stage_code] ?? r.stage_code}</td>
-                    <td className="px-3 py-2">{LANG_LABELS[r.lang_code] ?? r.lang_code}</td>
-                    <td className={`px-3 py-2 font-medium ${STATUS_COLORS[r.status] ?? ''}`}>
-                      {STATUS_LABELS[r.status] ?? r.status}
-                    </td>
-                    <td className="px-3 py-2">{r.staff_count}</td>
-                    <td className="px-3 py-2">{r.avg_score ?? '-'}</td>
-                    <td className="px-3 py-2">{r.avg_attempts ?? '-'}</td>
-                    <td className="px-3 py-2 text-ink-muted">{r.attempt_pass_rate ?? '-'}%</td>
+                {summaryRows.map((r) => (
+                  <tr key={r.key}>
+                    <td className="px-3 py-2">{r.institutionName}</td>
+                    <td className="px-3 py-2">{r.total}</td>
+                    <td className="px-3 py-2 text-status-pass">{r.passed}</td>
+                    <td className="px-3 py-2 text-status-fail">{r.failed}</td>
+                    <td className="px-3 py-2 text-ink-muted">{r.other}</td>
+                    <td className="px-3 py-2 font-medium">{r.passRate ?? '-'}%</td>
+                    <td className="px-3 py-2">{r.avgScorePassed ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p className="text-xs text-ink-muted">
-            「平均測考通過率（人次）」是以每一次作答計算的參考指標，一人補考多次會計入多次；正式及格率一律以「人」為單位，見上方圖表與「人數」欄位。
+            表格已彙總成每機構一列（與上方圖表同一層級）；要看特定階段或國籍的細節，用上方篩選縮小範圍即可。正式及格率一律以「人」為單位計算，同一人補考多次只計最終結果一次。
           </p>
         </>
       )}

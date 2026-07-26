@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, Upload } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Loader2, Plus, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { fetchCategories, fetchInstitutions } from '@/features/institutions/api'
@@ -30,6 +30,7 @@ export default function StaffPage() {
   const [editing, setEditing] = useState<StaffRow | 'new' | null>(null)
   const [importing, setImporting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [openInstitutions, setOpenInstitutions] = useState<Set<number | 'none'>>(new Set())
 
   const reload = useCallback(async () => {
     setError(null)
@@ -52,6 +53,37 @@ export default function StaffPage() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  // 依機構分資料夾：機構管理者要在幾十位學員裡找人時，先展開自己負責的機構就好，不用整張表滑來滑去
+  const staffByInstitution = useMemo(() => {
+    const map = new Map<number | 'none', StaffRow[]>()
+    for (const row of staff) {
+      const key = row.institution_id ?? 'none'
+      const list = map.get(key) ?? []
+      list.push(row)
+      map.set(key, list)
+    }
+    return map
+  }, [staff])
+
+  const institutionsByCategory = useMemo(() => {
+    const map = new Map<number, Institution[]>()
+    for (const inst of institutions) {
+      const list = map.get(inst.category_id) ?? []
+      list.push(inst)
+      map.set(inst.category_id, list)
+    }
+    return map
+  }, [institutions])
+
+  function toggleInstitution(key: number | 'none') {
+    setOpenInstitutions((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   async function handleToggleActive(row: StaffRow) {
     try {
@@ -90,13 +122,15 @@ export default function StaffPage() {
     )
   }
 
+  const unassigned = staffByInstitution.get('none') ?? []
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold">學員管理</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            在職學員只能停用不能刪除；已停用者可以刪除。
+            在職學員只能停用不能刪除；已停用者可以刪除。點機構名稱展開/收合底下的學員名單。
           </p>
         </div>
         <div className="flex gap-2">
@@ -122,68 +156,48 @@ export default function StaffPage() {
         </Card>
       )}
 
-      <Card className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b border-line bg-surface-muted text-left text-ink-muted">
-            <tr>
-              <th className="px-4 py-2 font-medium">工號</th>
-              <th className="px-4 py-2 font-medium">姓名</th>
-              <th className="px-4 py-2 font-medium">國籍</th>
-              <th className="px-4 py-2 font-medium">到職日</th>
-              <th className="px-4 py-2 font-medium">已合格階段</th>
-              <th className="px-4 py-2 font-medium">機構</th>
-              <th className="px-4 py-2 font-medium">狀態</th>
-              <th className="px-4 py-2 font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {staff.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-ink-muted">
-                  尚無學員資料
-                </td>
-              </tr>
-            )}
-            {staff.map((row) => (
-              <tr key={row.id} className={row.is_active ? '' : 'text-ink-muted'}>
-                <td className="px-4 py-2">{row.account_code}</td>
-                <td className="px-4 py-2">{row.display_name}</td>
-                <td className="px-4 py-2">{LANG_LABELS[row.lang_code] ?? row.lang_code}</td>
-                <td className="px-4 py-2">{row.hire_date}</td>
-                <td className="px-4 py-2">
-                  {row.current_stage ? STAGE_LABELS[row.current_stage] : '尚未設定'}
-                </td>
-                <td className="px-4 py-2">{row.institution_name ?? '-'}</td>
-                <td className="px-4 py-2">
-                  {row.is_active ? (
-                    <span className="text-status-pass">在職</span>
-                  ) : (
-                    <span>已停用</span>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(row)}>
-                      編輯
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleResetPassword(row)}>
-                      重設密碼
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleToggleActive(row)}>
-                      {row.is_active ? '停用' : '啟用'}
-                    </Button>
-                    {!row.is_active && (
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(row)}>
-                        刪除
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <div className="space-y-6">
+        {categories.map((category) => {
+          const insts = institutionsByCategory.get(category.id) ?? []
+          if (insts.length === 0) return null
+          return (
+            <div key={category.id}>
+              <h2 className="mb-2 text-sm font-semibold text-ink-muted">{category.name}</h2>
+              <div className="space-y-2">
+                {insts.map((inst) => (
+                  <InstitutionFolder
+                    key={inst.id}
+                    title={inst.name}
+                    rows={staffByInstitution.get(inst.id) ?? []}
+                    open={openInstitutions.has(inst.id)}
+                    onToggle={() => toggleInstitution(inst.id)}
+                    onEdit={setEditing}
+                    onResetPassword={handleResetPassword}
+                    onToggleActive={handleToggleActive}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+
+        {unassigned.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-ink-muted">未指定機構</h2>
+            <InstitutionFolder
+              title="未指定機構"
+              rows={unassigned}
+              open={openInstitutions.has('none')}
+              onToggle={() => toggleInstitution('none')}
+              onEdit={setEditing}
+              onResetPassword={handleResetPassword}
+              onToggleActive={handleToggleActive}
+              onDelete={handleDelete}
+            />
+          </div>
+        )}
+      </div>
 
       {editing && (
         <StaffFormModal
@@ -209,5 +223,101 @@ export default function StaffPage() {
         </Suspense>
       )}
     </div>
+  )
+}
+
+function InstitutionFolder({
+  title,
+  rows,
+  open,
+  onToggle,
+  onEdit,
+  onResetPassword,
+  onToggleActive,
+  onDelete,
+}: {
+  title: string
+  rows: StaffRow[]
+  open: boolean
+  onToggle: () => void
+  onEdit: (row: StaffRow) => void
+  onResetPassword: (row: StaffRow) => void
+  onToggleActive: (row: StaffRow) => void
+  onDelete: (row: StaffRow) => void
+}) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-surface-muted"
+      >
+        {open ? (
+          <ChevronDown className="size-4 shrink-0 text-ink-muted" aria-hidden />
+        ) : (
+          <ChevronRight className="size-4 shrink-0 text-ink-muted" aria-hidden />
+        )}
+        <span className="font-medium">{title}</span>
+        <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">{rows.length} 人</span>
+      </button>
+
+      {open && (
+        <div className="overflow-x-auto border-t border-line">
+          <table className="w-full text-sm">
+            <thead className="border-b border-line bg-surface-muted text-left text-ink-muted">
+              <tr>
+                <th className="px-4 py-2 font-medium">工號</th>
+                <th className="px-4 py-2 font-medium">姓名</th>
+                <th className="px-4 py-2 font-medium">國籍</th>
+                <th className="px-4 py-2 font-medium">到職日</th>
+                <th className="px-4 py-2 font-medium">已合格階段</th>
+                <th className="px-4 py-2 font-medium">狀態</th>
+                <th className="px-4 py-2 font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                    這個機構還沒有學員
+                  </td>
+                </tr>
+              )}
+              {rows.map((row) => (
+                <tr key={row.id} className={row.is_active ? '' : 'text-ink-muted'}>
+                  <td className="px-4 py-2">{row.account_code}</td>
+                  <td className="px-4 py-2">{row.display_name}</td>
+                  <td className="px-4 py-2">{LANG_LABELS[row.lang_code] ?? row.lang_code}</td>
+                  <td className="px-4 py-2">{row.hire_date}</td>
+                  <td className="px-4 py-2">
+                    {row.current_stage ? STAGE_LABELS[row.current_stage] : '尚未設定'}
+                  </td>
+                  <td className="px-4 py-2">
+                    {row.is_active ? <span className="text-status-pass">在職</span> : <span>已停用</span>}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
+                        編輯
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onResetPassword(row)}>
+                        重設密碼
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onToggleActive(row)}>
+                        {row.is_active ? '停用' : '啟用'}
+                      </Button>
+                      {!row.is_active && (
+                        <Button size="sm" variant="ghost" onClick={() => onDelete(row)}>
+                          刪除
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   )
 }
