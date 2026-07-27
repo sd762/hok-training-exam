@@ -18,6 +18,9 @@ export const LANG_LABELS: Record<LangCode, string> = {
   id: '印尼文',
 }
 
+// 只有這兩個語言會考音訊題，台籍(zh-TW)不考
+export const AUDIO_QUESTION_LANGS: LangCode[] = ['vi', 'id']
+
 export interface QuestionRow {
   id: number
   exam_def_id: number
@@ -30,6 +33,8 @@ export interface QuestionRow {
   answer: number[]
   explanation: string | null
   is_active: boolean
+  /** Storage 裡的音檔路徑，沒有就是一般文字題 */
+  audio_path: string | null
 }
 
 export interface QuestionInput {
@@ -42,6 +47,7 @@ export interface QuestionInput {
   options: string[]
   answer: number[]
   explanation?: string
+  audio_path?: string | null
 }
 
 export async function fetchExamDefs(): Promise<ExamDef[]> {
@@ -56,7 +62,7 @@ export async function fetchExamDefs(): Promise<ExamDef[]> {
 export async function fetchQuestions(examDefId: number, langCode: LangCode): Promise<QuestionRow[]> {
   const { data, error } = await supabase
     .from('question_bank')
-    .select('id, exam_def_id, lang_code, q_type, score, text, options_json, answer_json, explanation, is_active')
+    .select('id, exam_def_id, lang_code, q_type, score, text, options_json, answer_json, explanation, is_active, audio_path')
     .eq('exam_def_id', examDefId)
     .eq('lang_code', langCode)
     .order('id')
@@ -73,6 +79,7 @@ export async function fetchQuestions(examDefId: number, langCode: LangCode): Pro
     answer: row.answer_json as number[],
     explanation: row.explanation,
     is_active: row.is_active,
+    audio_path: row.audio_path,
   }))
 }
 
@@ -87,6 +94,36 @@ interface RawQuestionRow {
   answer_json: unknown
   explanation: string | null
   is_active: boolean
+  audio_path: string | null
+}
+
+/** 已經有音檔的題目路徑清單（同一考試定義底下），供新增音訊題時「重複使用既有音檔」選取 */
+export async function fetchUsedAudioPaths(examDefId: number): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('question_bank')
+    .select('audio_path')
+    .eq('exam_def_id', examDefId)
+    .not('audio_path', 'is', null)
+  if (error) throw error
+  return [...new Set((data as { audio_path: string }[]).map((r) => r.audio_path))]
+}
+
+const AUDIO_BUCKET = 'question-audio'
+
+/** 上傳新音檔，回傳 Storage 路徑（不是網址——網址由學員端 take-exam Edge Function 簽發） */
+export async function uploadQuestionAudio(examDefId: number, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'mp3'
+  const path = `${examDefId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(AUDIO_BUCKET).upload(path, file)
+  if (error) throw error
+  return path
+}
+
+/** 後台預覽用的簽名網址（管理者角色對這個 bucket 有直接 select 權限，不需要經過 Edge Function） */
+export async function getAudioPreviewUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(AUDIO_BUCKET).createSignedUrl(path, 300)
+  if (error) throw error
+  return data.signedUrl
 }
 
 export async function createQuestion(input: QuestionInput): Promise<void> {
@@ -99,6 +136,7 @@ export async function createQuestion(input: QuestionInput): Promise<void> {
     options_json: input.options,
     answer_json: input.answer,
     explanation: input.explanation || null,
+    audio_path: input.audio_path || null,
   })
   if (error) throw error
 }
@@ -114,6 +152,7 @@ export async function updateQuestion(input: QuestionInput): Promise<void> {
       options_json: input.options,
       answer_json: input.answer,
       explanation: input.explanation || null,
+      audio_path: input.audio_path || null,
     })
     .eq('id', input.id)
   if (error) throw error

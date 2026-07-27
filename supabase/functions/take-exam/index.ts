@@ -31,6 +31,16 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 // ---- 測驗規則常數（ADR 0006／0010，2026-07-23 使用者定案）----
 const QUESTIONS_PER_EXAM = 25
+
+// ---- 音訊題（聽力題）規則（2026-07-26 使用者定案）----
+// 只有越南文/印尼文考音訊題，台籍不考；25題裡固定5題音訊+20題一般題，
+// 但音訊題庫還沒建到5題以前，維持現狀（25題全部從一般題庫抽），見 selectQuestions()。
+const AUDIO_QUESTION_LANGS = new Set(['vi', 'id'])
+const AUDIO_QUESTIONS_PER_EXAM = 5
+const REGULAR_QUESTIONS_PER_EXAM = QUESTIONS_PER_EXAM - AUDIO_QUESTIONS_PER_EXAM
+const AUDIO_BUCKET = 'question-audio'
+// 簽名網址有效期，要夠長涵蓋一次應考+中途重新整理續答；每次 start 都會重新簽發，不會存進資料庫
+const AUDIO_URL_EXPIRY_SECONDS = 3600
 const MAX_ATTEMPTS_PER_CYCLE = 3
 const LOCKOUT_DAYS = 7
 const STAGE_ORDER = ['1m', '3m', '1y'] as const
@@ -236,7 +246,7 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
     return jsonResponse({
       attempt_id: inProgress.id,
       exam: examDef,
-      questions: stripAnswers(inProgress.detail_json.questions),
+      questions: await attachAudioUrls(admin, stripAnswers(inProgress.detail_json.questions)),
     })
   }
 
@@ -253,16 +263,15 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
 
   const { data: pool } = await admin
     .from('question_bank')
-    .select('id, q_type, score, text, options_json, answer_json, explanation')
+    .select('id, q_type, score, text, options_json, answer_json, explanation, audio_path')
     .eq('exam_def_id', examDef.id)
     .eq('lang_code', staffDetail!.lang_code)
     .eq('is_active', true)
 
-  if (!pool || pool.length < QUESTIONS_PER_EXAM) {
-    return jsonResponse({ error: `題庫不足 ${QUESTIONS_PER_EXAM} 題，無法出題（目前 ${pool?.length ?? 0} 題）` }, 400)
-  }
+  const poolCheck = checkPoolSize(pool ?? [], staffDetail!.lang_code)
+  if (!poolCheck.ok) return jsonResponse({ error: poolCheck.error }, 400)
 
-  const selected = await selectQuestions(admin, staffId, examDef.id, pool, cycle.cycleAttemptNumber!)
+  const selected = await selectQuestions(admin, staffId, examDef.id, pool!, staffDetail!.lang_code, cycle.cycleAttemptNumber!)
   const snapshotQuestions = shuffle(selected).map((q) => {
     const options = q.options_json as string[]
     const order = shuffle(options.map((_, i) => i)) // order[顯示位置] = 原始選項位置
@@ -275,6 +284,7 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
       options: order.map((i) => options[i]),
       option_order: order,
       answer_original: q.answer_json as number[],
+      audio_path: q.audio_path ?? null,
     }
   })
 
@@ -292,18 +302,76 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
     .single()
   if (error) return jsonResponse({ error: error.message }, 400)
 
-  return jsonResponse({ attempt_id: created.id, exam: examDef, questions: stripAnswers(snapshotQuestions) })
+  return jsonResponse({
+    attempt_id: created.id,
+    exam: examDef,
+    questions: await attachAudioUrls(admin, stripAnswers(snapshotQuestions)),
+  })
 }
 
-/** ADR 0010：第1次全題庫隨機抽25、第2次扣除第1次抽過的題目後再抽、第3次重新全題庫隨機抽 */
+type PoolQuestion = { id: number; audio_path?: string | null }
+
+/** 該語言是否要用「20一般＋5音訊」的抽法：只有 vi/id，且音訊題庫已經有滿5題可用 */
+function usesAudioSplit(pool: PoolQuestion[], langCode: string): boolean {
+  if (!AUDIO_QUESTION_LANGS.has(langCode)) return false
+  return pool.filter((q) => q.audio_path).length >= AUDIO_QUESTIONS_PER_EXAM
+}
+
+/** 出題前檢查題庫夠不夠——依語言/音訊題庫現況，檢查的是「實際會抽的那個池子」，不是籠統的題庫總數 */
+function checkPoolSize(pool: PoolQuestion[], langCode: string): { ok: true } | { ok: false; error: string } {
+  if (usesAudioSplit(pool, langCode)) {
+    const regularCount = pool.filter((q) => !q.audio_path).length
+    const audioCount = pool.filter((q) => q.audio_path).length
+    if (regularCount < REGULAR_QUESTIONS_PER_EXAM || audioCount < AUDIO_QUESTIONS_PER_EXAM) {
+      return {
+        ok: false,
+        error: `題庫不足（一般題需 ${REGULAR_QUESTIONS_PER_EXAM} 題，目前 ${regularCount} 題；音訊題需 ${AUDIO_QUESTIONS_PER_EXAM} 題，目前 ${audioCount} 題）`,
+      }
+    }
+    return { ok: true }
+  }
+  const regularCount = pool.filter((q) => !q.audio_path).length
+  if (regularCount < QUESTIONS_PER_EXAM) {
+    return { ok: false, error: `題庫不足 ${QUESTIONS_PER_EXAM} 題，無法出題（目前 ${regularCount} 題）` }
+  }
+  return { ok: true }
+}
+
+/** ADR 0010：第1次全題庫隨機抽、第2次扣除第1次抽過的題目後再抽、第3次重新全題庫隨機抽。
+ *  2026-07-26 追加：vi/id 且音訊題庫滿5題時，一般題與音訊題分開抽（各自套用同一套第2次排除規則），
+ *  湊成 20+5＝25 題；其餘情況（台籍，或音訊題還沒建滿）維持完全比照原本邏輯，只從一般題庫抽25題。 */
 async function selectQuestions(
   admin: ReturnType<typeof createClient>,
   staffId: string,
   examDefId: number,
-  pool: { id: number }[],
+  pool: PoolQuestion[],
+  langCode: string,
   cycleAttemptNumber: number,
 ) {
-  if (cycleAttemptNumber !== 2) return sampleN(pool, QUESTIONS_PER_EXAM)
+  if (!usesAudioSplit(pool, langCode)) {
+    const regularPool = pool.filter((q) => !q.audio_path)
+    return selectFromPool(admin, staffId, examDefId, regularPool, QUESTIONS_PER_EXAM, cycleAttemptNumber)
+  }
+
+  const regularPool = pool.filter((q) => !q.audio_path)
+  const audioPool = pool.filter((q) => q.audio_path)
+  const [regularSelected, audioSelected] = await Promise.all([
+    selectFromPool(admin, staffId, examDefId, regularPool, REGULAR_QUESTIONS_PER_EXAM, cycleAttemptNumber),
+    selectFromPool(admin, staffId, examDefId, audioPool, AUDIO_QUESTIONS_PER_EXAM, cycleAttemptNumber),
+  ])
+  return [...regularSelected, ...audioSelected]
+}
+
+/** 單一題池的抽選：第2次補考要排除上次抽過的題目，其餘次數全池隨機抽 */
+async function selectFromPool<T extends { id: number }>(
+  admin: ReturnType<typeof createClient>,
+  staffId: string,
+  examDefId: number,
+  pool: T[],
+  count: number,
+  cycleAttemptNumber: number,
+): Promise<T[]> {
+  if (cycleAttemptNumber !== 2) return sampleN(pool, count)
 
   const { data: previous } = await admin
     .from('attempt')
@@ -319,13 +387,26 @@ async function selectQuestions(
     (previous?.detail_json?.questions ?? []).map((q: { question_id: number }) => q.question_id),
   )
   const remaining = pool.filter((q) => !usedIds.has(q.id))
-  if (remaining.length >= QUESTIONS_PER_EXAM) return sampleN(remaining, QUESTIONS_PER_EXAM)
-  // 題庫題數剛好等於上限時，扣除後理論上恰好打平；不足時退回全題庫隨機抽，避免抽不滿
-  return sampleN(pool, QUESTIONS_PER_EXAM)
+  if (remaining.length >= count) return sampleN(remaining, count)
+  // 這個池子扣除後不夠抽：退回這個池子全池隨機抽，避免抽不滿（跟原本規則一致）
+  return sampleN(pool, count)
 }
 
 function stripAnswers(questions: Record<string, unknown>[]) {
   return questions.map(({ answer_original: _answer_original, explanation: _explanation, ...rest }) => rest)
+}
+
+/** 幫每一題有 audio_path 的題目簽發限時播放網址（never 存進資料庫，每次呼叫都重新簽） */
+async function attachAudioUrls(admin: ReturnType<typeof createClient>, questions: Record<string, unknown>[]) {
+  return Promise.all(
+    questions.map(async (q) => {
+      const audioPath = q.audio_path as string | null | undefined
+      const { audio_path: _audio_path, ...rest } = q
+      if (!audioPath) return rest
+      const { data } = await admin.storage.from(AUDIO_BUCKET).createSignedUrl(audioPath, AUDIO_URL_EXPIRY_SECONDS)
+      return { ...rest, audio_url: data?.signedUrl ?? null }
+    }),
+  )
 }
 
 function sampleN<T>(arr: T[], n: number): T[] {
@@ -353,6 +434,7 @@ interface SnapshotQuestion {
   options: string[]
   option_order: number[]
   answer_original: number[]
+  audio_path?: string | null
   selected_original?: number[]
   is_correct?: boolean
 }
@@ -418,7 +500,10 @@ async function handleSubmit(
   // 不及格時，附上這次失敗後的重考次數/鎖定資訊，讓前端能提示「請重新進行第N次測驗」或鎖定日期
   const retry = passed ? null : await getCycleStatus(admin, staffId, attempt.exam_def_id)
 
-  return jsonResponse({ score, passed, status, questions, retry })
+  // 結果頁要能重聽音訊題，同樣簽發限時網址；這裡不能用 stripAnswers（結果頁本來就要顯示正解）
+  const questionsWithAudio = await attachAudioUrls(admin, questions as unknown as Record<string, unknown>[])
+
+  return jsonResponse({ score, passed, status, questions: questionsWithAudio, retry })
 }
 
 // ---------------------------------------------------------------------------

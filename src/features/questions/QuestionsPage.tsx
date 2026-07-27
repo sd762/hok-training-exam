@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, Upload } from 'lucide-react'
+import { Loader2, Plus, Upload, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
@@ -172,7 +172,14 @@ export default function QuestionsPage() {
               )}
               {questions.map((q) => (
                 <tr key={q.id} className={q.is_active ? '' : 'text-ink-muted'}>
-                  <td className="max-w-md truncate px-4 py-2">{q.text}</td>
+                  <td className="max-w-md px-4 py-2">
+                    <div className="flex items-center gap-1.5">
+                      {q.audio_path && (
+                        <Volume2 className="size-4 shrink-0 text-brand-600" aria-label="音訊題" />
+                      )}
+                      <span className="truncate">{q.text}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-2">{q.q_type === 'single' ? '單選' : '複選'}</td>
                   <td className="px-4 py-2">{q.score}</td>
                   <td className="px-4 py-2">

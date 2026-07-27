@@ -26,6 +26,8 @@ export interface QuestionView {
   score: number
   text: string
   options: string[]
+  /** 音訊題（聽力題）才有，限時簽名網址，每次開始/續答測驗都會重新簽發 */
+  audio_url?: string | null
 }
 
 export interface StartResult {

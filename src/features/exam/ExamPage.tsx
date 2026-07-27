@@ -164,6 +164,13 @@ export default function ExamPage() {
             {' '}
             {q.type === 'single' ? t('single_choice_hint') : t('multiple_choice_hint')}
           </p>
+          {q.audio_url && (
+            <div className="mt-2 rounded-lg bg-surface-muted p-3">
+              <p className="mb-1.5 text-xs text-ink-muted">{t('listen_hint')}</p>
+              {/* preload=none：25題裡最多只有5題音訊，不要求瀏覽器一次把全部音檔都先抓下來 */}
+              <audio controls preload="none" src={q.audio_url} className="w-full" />
+            </div>
+          )}
           <p className="mt-2">{q.text}</p>
 
           <div className="mt-4 space-y-2">
@@ -240,6 +247,9 @@ function ExamResult({
               {q.is_correct ? '✓' : '✗'}
             </span>
             <div className="flex-1">
+              {q.audio_url && (
+                <audio controls preload="none" src={q.audio_url} className="mb-2 w-full" />
+              )}
               <p className="font-medium">
                 {i + 1}. {q.text}
               </p>

@@ -64,6 +64,11 @@ const dict = {
   answer_incorrect: { 'zh-TW': '答錯', vi: 'Sai', id: 'Salah' },
   single_choice_hint: { 'zh-TW': '（單選）', vi: '（Chọn một）', id: '（Pilih satu）' },
   multiple_choice_hint: { 'zh-TW': '（複選）', vi: '（Chọn nhiều）', id: '（Pilih lebih dari satu）' },
+  listen_hint: {
+    'zh-TW': '請先播放音訊，再作答',
+    vi: 'Vui lòng nghe âm thanh trước khi trả lời',
+    id: 'Dengarkan audio terlebih dahulu sebelum menjawab',
+  },
 
   result_passed: { 'zh-TW': '恭喜及格', vi: 'Chúc mừng, đạt', id: 'Selamat, Lulus' },
   result_failed: { 'zh-TW': '未達及格分數', vi: 'Chưa đạt điểm đậu', id: 'Belum Mencapai Nilai Kelulusan' },
