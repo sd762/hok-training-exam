@@ -152,8 +152,17 @@ export default function ExamPage() {
       </div>
 
       {tabSwitchWarned && (
-        <div className="rounded-lg border border-status-fail/30 bg-status-fail/10 p-3 text-sm text-status-fail">
-          {t('tab_switch_warning')}
+        // 用 fixed 蓋版而不是插在文件流裡的橫幅：25題的作答畫面很長，學員被警告當下
+        // 常常已經捲到後面的題目，插在最上方的橫幅會滑出畫面外看不到，等於沒警告到，
+        // 蓋版不管捲到哪裡都會蓋在畫面正中間，且要按按鈕才能關掉，確保真的有看到。
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <Card className="max-w-sm p-6 text-center">
+            <AlertTriangle className="mx-auto size-10 text-status-fail" aria-hidden />
+            <p className="mt-3 text-sm text-status-fail">{t('tab_switch_warning')}</p>
+            <Button className="mt-5 w-full" onClick={() => setTabSwitchWarned(false)}>
+              {t('tab_switch_warning_acknowledge')}
+            </Button>
+          </Card>
         </div>
       )}
 

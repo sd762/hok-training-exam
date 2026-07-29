@@ -118,6 +118,11 @@ const dict = {
     vi: 'Phát hiện bạn rời khỏi màn hình thi, đây là cảnh báo lần 1, nếu tái phạm bài thi sẽ bị hủy ngay và tính là một lần trượt',
     id: 'Terdeteksi Anda meninggalkan layar ujian, ini adalah peringatan ke-1, jika terulang ujian akan langsung dibatalkan dan dihitung sebagai satu kali gagal',
   },
+  tab_switch_warning_acknowledge: {
+    'zh-TW': '我知道了，繼續作答',
+    vi: 'Tôi đã hiểu, tiếp tục làm bài',
+    id: 'Saya mengerti, lanjutkan mengerjakan',
+  },
   aborted_title: { 'zh-TW': '測驗已中止', vi: 'Bài thi đã bị hủy', id: 'Ujian Dibatalkan' },
   aborted_body_face: {
     'zh-TW': '因多次偵測不到您的臉，本次測驗已自動中止，計入一次失敗。',
