@@ -118,7 +118,8 @@ const dict = {
     vi: 'Phát hiện bạn rời khỏi màn hình thi, đây là cảnh báo lần 1, nếu tái phạm bài thi sẽ bị hủy ngay và tính là một lần trượt',
     id: 'Terdeteksi Anda meninggalkan layar ujian, ini adalah peringatan ke-1, jika terulang ujian akan langsung dibatalkan dan dihitung sebagai satu kali gagal',
   },
-  tab_switch_warning_acknowledge: {
+  // 蓋版警告的確認按鈕，切換視窗警告、人臉消失警告共用同一個詞條
+  proctoring_ack_button: {
     'zh-TW': '我知道了，繼續作答',
     vi: 'Tôi đã hiểu, tiếp tục làm bài',
     id: 'Saya mengerti, lanjutkan mengerjakan',

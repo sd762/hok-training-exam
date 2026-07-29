@@ -21,6 +21,10 @@ export function useProctoring(
 ) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [showFaceWarning, setShowFaceWarning] = useState(false)
+  // 小攝影機縮圖上的持續狀態指示（showFaceWarning）容易被忽略，另外開一個
+  // 「警告事件」蓋版提示——每次真的觸發警告（回報伺服器成功）才彈一次，
+  // 需要學員按確認才會關掉，不會因為人臉時有時無而一直反覆彈出。
+  const [faceWarningModalOpen, setFaceWarningModalOpen] = useState(false)
 
   useEffect(() => {
     if (!stream || !attemptId) return
@@ -72,6 +76,8 @@ export function useProctoring(
             if (res.aborted) {
               stopped = true
               onAborted()
+            } else {
+              setFaceWarningModalOpen(true)
             }
           } catch (err) {
             console.error('回報監考警告失敗：', err)
@@ -101,5 +107,10 @@ export function useProctoring(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream, attemptId])
 
-  return { videoRef, showFaceWarning }
+  return {
+    videoRef,
+    showFaceWarning,
+    faceWarningModalOpen,
+    dismissFaceWarningModal: () => setFaceWarningModalOpen(false),
+  }
 }

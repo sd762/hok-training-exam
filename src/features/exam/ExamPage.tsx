@@ -37,8 +37,10 @@ export default function ExamPage() {
     setAbortedReason(reason)
   }
 
-  const { videoRef, showFaceWarning } = useProctoring(stream, session?.attempt_id ?? null, () =>
-    handleAborted('face'),
+  const { videoRef, showFaceWarning, faceWarningModalOpen, dismissFaceWarningModal } = useProctoring(
+    stream,
+    session?.attempt_id ?? null,
+    () => handleAborted('face'),
   )
 
   useTabSwitchGuard(session?.attempt_id ?? null, videoRef, () => setTabSwitchWarned(true), () =>
@@ -151,6 +153,20 @@ export default function ExamPage() {
         </p>
       </div>
 
+      {faceWarningModalOpen && (
+        // 小攝影機縮圖上的即時警示容易被忽略（畫面很小、放在角落），跟切換視窗警告
+        // 用同一種蓋版處理，不管捲到哪裡都會蓋在畫面正中間，按按鈕才能關掉。
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <Card className="max-w-sm p-6 text-center">
+            <AlertTriangle className="mx-auto size-10 text-status-fail" aria-hidden />
+            <p className="mt-3 text-sm text-status-fail">{t('face_missing_warning')}</p>
+            <Button className="mt-5 w-full" onClick={dismissFaceWarningModal}>
+              {t('proctoring_ack_button')}
+            </Button>
+          </Card>
+        </div>
+      )}
+
       {tabSwitchWarned && (
         // 用 fixed 蓋版而不是插在文件流裡的橫幅：25題的作答畫面很長，學員被警告當下
         // 常常已經捲到後面的題目，插在最上方的橫幅會滑出畫面外看不到，等於沒警告到，
@@ -160,7 +176,7 @@ export default function ExamPage() {
             <AlertTriangle className="mx-auto size-10 text-status-fail" aria-hidden />
             <p className="mt-3 text-sm text-status-fail">{t('tab_switch_warning')}</p>
             <Button className="mt-5 w-full" onClick={() => setTabSwitchWarned(false)}>
-              {t('tab_switch_warning_acknowledge')}
+              {t('proctoring_ack_button')}
             </Button>
           </Card>
         </div>
