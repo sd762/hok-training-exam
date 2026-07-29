@@ -171,20 +171,32 @@ export default function ExamPage() {
               <audio controls preload="none" src={q.audio_url} className="w-full" />
             </div>
           )}
+          {q.image_url && (
+            <img src={q.image_url} alt="" className="mt-2 max-h-64 w-full rounded-lg object-contain" />
+          )}
           <p className="mt-2">{q.text}</p>
 
           <div className="mt-4 space-y-2">
-            {q.options.map((option, optIndex) => (
-              <label key={optIndex} className="flex items-center gap-2 rounded-lg border border-line p-3 hover:bg-surface-muted">
-                <input
-                  type={q.type === 'single' ? 'radio' : 'checkbox'}
-                  name={`q-${qIndex}`}
-                  checked={answers[qIndex]?.includes(optIndex) ?? false}
-                  onChange={() => toggleAnswer(qIndex, optIndex, q.type)}
-                />
-                <span>{option}</span>
-              </label>
-            ))}
+            {q.options.map((option, optIndex) => {
+              const optionImage = q.option_image_urls?.[optIndex]
+              return (
+                <label
+                  key={optIndex}
+                  className="flex items-center gap-3 rounded-lg border border-line p-3 hover:bg-surface-muted"
+                >
+                  <input
+                    type={q.type === 'single' ? 'radio' : 'checkbox'}
+                    name={`q-${qIndex}`}
+                    checked={answers[qIndex]?.includes(optIndex) ?? false}
+                    onChange={() => toggleAnswer(qIndex, optIndex, q.type)}
+                  />
+                  {optionImage && (
+                    <img src={optionImage} alt="" className="h-20 w-20 shrink-0 rounded object-cover" />
+                  )}
+                  <span>{option}</span>
+                </label>
+              )
+            })}
           </div>
         </Card>
       ))}
@@ -250,6 +262,9 @@ function ExamResult({
               {q.audio_url && (
                 <audio controls preload="none" src={q.audio_url} className="mb-2 w-full" />
               )}
+              {q.image_url && (
+                <img src={q.image_url} alt="" className="mb-2 max-h-64 w-full rounded-lg object-contain" />
+              )}
               <p className="font-medium">
                 {i + 1}. {q.text}
               </p>
@@ -258,12 +273,18 @@ function ExamResult({
                   const originalPosition = q.option_order[optIndex]
                   const wasSelected = q.selected_original.includes(originalPosition)
                   const wasCorrect = q.answer_original.includes(originalPosition)
+                  const optionImage = q.option_image_urls?.[optIndex]
                   return (
-                    <p key={optIndex} className={cn('text-sm', wasCorrect && 'font-medium text-status-pass')}>
-                      {option}
-                      {wasCorrect && <span className="ml-2 text-status-pass">{t('correct_answer_label')}</span>}
-                      {wasSelected && <span className="ml-2 text-ink-muted">{t('your_answer_label')}</span>}
-                    </p>
+                    <div key={optIndex} className="flex items-center gap-2">
+                      {optionImage && (
+                        <img src={optionImage} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
+                      )}
+                      <p className={cn('text-sm', wasCorrect && 'font-medium text-status-pass')}>
+                        {option}
+                        {wasCorrect && <span className="ml-2 text-status-pass">{t('correct_answer_label')}</span>}
+                        {wasSelected && <span className="ml-2 text-ink-muted">{t('your_answer_label')}</span>}
+                      </p>
+                    </div>
                   )
                 })}
               </div>

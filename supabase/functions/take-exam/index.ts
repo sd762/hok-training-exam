@@ -39,6 +39,11 @@ const AUDIO_QUESTION_LANGS = new Set(['vi', 'id'])
 const AUDIO_QUESTIONS_PER_EXAM = 5
 const REGULAR_QUESTIONS_PER_EXAM = QUESTIONS_PER_EXAM - AUDIO_QUESTIONS_PER_EXAM
 const AUDIO_BUCKET = 'question-audio'
+
+// ---- 圖片題規則（2026-07-26 使用者定案）----
+// 題目配圖／選項圖片，三語言都能用，不像音訊題那樣保證固定題數，隨機出現即可，抽題邏輯不受影響。
+const IMAGE_BUCKET = 'question-images'
+
 // 簽名網址有效期，要夠長涵蓋一次應考+中途重新整理續答；每次 start 都會重新簽發，不會存進資料庫
 const AUDIO_URL_EXPIRY_SECONDS = 3600
 const MAX_ATTEMPTS_PER_CYCLE = 3
@@ -263,7 +268,7 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
 
   const { data: pool } = await admin
     .from('question_bank')
-    .select('id, q_type, score, text, options_json, answer_json, explanation, audio_path')
+    .select('id, q_type, score, text, options_json, answer_json, explanation, audio_path, image_path, option_images_json')
     .eq('exam_def_id', examDef.id)
     .eq('lang_code', staffDetail!.lang_code)
     .eq('is_active', true)
@@ -274,6 +279,7 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
   const selected = await selectQuestions(admin, staffId, examDef.id, pool!, staffDetail!.lang_code, cycle.cycleAttemptNumber!)
   const snapshotQuestions = shuffle(selected).map((q) => {
     const options = q.options_json as string[]
+    const optionImages = (q.option_images_json as (string | null)[] | null) ?? null
     const order = shuffle(options.map((_, i) => i)) // order[顯示位置] = 原始選項位置
     return {
       question_id: q.id,
@@ -282,9 +288,12 @@ async function handleStart(admin: ReturnType<typeof createClient>, staffId: stri
       text: q.text,
       explanation: q.explanation ?? '',
       options: order.map((i) => options[i]),
+      // 選項打亂順序後，選項圖片要跟著同一份 order 重排，不然圖片會對不上文字/正確答案位置
+      option_images: optionImages ? order.map((i) => optionImages[i] ?? null) : null,
       option_order: order,
       answer_original: q.answer_json as number[],
       audio_path: q.audio_path ?? null,
+      image_path: q.image_path ?? null,
     }
   })
 
@@ -396,17 +405,36 @@ function stripAnswers(questions: Record<string, unknown>[]) {
   return questions.map(({ answer_original: _answer_original, explanation: _explanation, ...rest }) => rest)
 }
 
-/** 幫每一題有 audio_path 的題目簽發限時播放網址（never 存進資料庫，每次呼叫都重新簽） */
+/** 幫每一題有 audio_path/image_path/option_images 的題目簽發限時網址（never 存進資料庫，每次呼叫都重新簽） */
 async function attachAudioUrls(admin: ReturnType<typeof createClient>, questions: Record<string, unknown>[]) {
   return Promise.all(
     questions.map(async (q) => {
       const audioPath = q.audio_path as string | null | undefined
-      const { audio_path: _audio_path, ...rest } = q
-      if (!audioPath) return rest
-      const { data } = await admin.storage.from(AUDIO_BUCKET).createSignedUrl(audioPath, AUDIO_URL_EXPIRY_SECONDS)
-      return { ...rest, audio_url: data?.signedUrl ?? null }
+      const imagePath = q.image_path as string | null | undefined
+      const optionImages = (q.option_images as (string | null)[] | null | undefined) ?? null
+      const { audio_path: _audio_path, image_path: _image_path, option_images: _option_images, ...rest } = q
+
+      const [audioUrl, imageUrl, optionImageUrls] = await Promise.all([
+        audioPath ? signUrl(admin, AUDIO_BUCKET, audioPath) : null,
+        imagePath ? signUrl(admin, IMAGE_BUCKET, imagePath) : null,
+        optionImages
+          ? Promise.all(optionImages.map((p) => (p ? signUrl(admin, IMAGE_BUCKET, p) : null)))
+          : null,
+      ])
+
+      return {
+        ...rest,
+        ...(audioUrl !== null ? { audio_url: audioUrl } : {}),
+        ...(imageUrl !== null ? { image_url: imageUrl } : {}),
+        ...(optionImageUrls !== null ? { option_image_urls: optionImageUrls } : {}),
+      }
     }),
   )
+}
+
+async function signUrl(admin: ReturnType<typeof createClient>, bucket: string, path: string): Promise<string | null> {
+  const { data } = await admin.storage.from(bucket).createSignedUrl(path, AUDIO_URL_EXPIRY_SECONDS)
+  return data?.signedUrl ?? null
 }
 
 function sampleN<T>(arr: T[], n: number): T[] {
@@ -435,6 +463,8 @@ interface SnapshotQuestion {
   option_order: number[]
   answer_original: number[]
   audio_path?: string | null
+  image_path?: string | null
+  option_images?: (string | null)[] | null
   selected_original?: number[]
   is_correct?: boolean
 }

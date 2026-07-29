@@ -35,6 +35,10 @@ export interface QuestionRow {
   is_active: boolean
   /** Storage 裡的音檔路徑，沒有就是一般文字題 */
   audio_path: string | null
+  /** 題目本身配的圖（跟音訊不同，三語言都能用） */
+  image_path: string | null
+  /** 跟 options 等長，每格是該選項的圖片路徑或 null（選項本身是圖片時使用） */
+  option_images: (string | null)[] | null
 }
 
 export interface QuestionInput {
@@ -48,6 +52,8 @@ export interface QuestionInput {
   answer: number[]
   explanation?: string
   audio_path?: string | null
+  image_path?: string | null
+  option_images?: (string | null)[] | null
 }
 
 export async function fetchExamDefs(): Promise<ExamDef[]> {
@@ -59,10 +65,13 @@ export async function fetchExamDefs(): Promise<ExamDef[]> {
   return data
 }
 
+const QUESTION_COLUMNS =
+  'id, exam_def_id, lang_code, q_type, score, text, options_json, answer_json, explanation, is_active, audio_path, image_path, option_images_json'
+
 export async function fetchQuestions(examDefId: number, langCode: LangCode): Promise<QuestionRow[]> {
   const { data, error } = await supabase
     .from('question_bank')
-    .select('id, exam_def_id, lang_code, q_type, score, text, options_json, answer_json, explanation, is_active, audio_path')
+    .select(QUESTION_COLUMNS)
     .eq('exam_def_id', examDefId)
     .eq('lang_code', langCode)
     .order('id')
@@ -80,6 +89,8 @@ export async function fetchQuestions(examDefId: number, langCode: LangCode): Pro
     explanation: row.explanation,
     is_active: row.is_active,
     audio_path: row.audio_path,
+    image_path: row.image_path,
+    option_images: (row.option_images_json as (string | null)[] | null) ?? null,
   }))
 }
 
@@ -95,6 +106,8 @@ interface RawQuestionRow {
   explanation: string | null
   is_active: boolean
   audio_path: string | null
+  image_path: string | null
+  option_images_json: unknown
 }
 
 /** 已經有音檔的題目路徑清單（同一考試定義底下），供新增音訊題時「重複使用既有音檔」選取 */
@@ -108,7 +121,29 @@ export async function fetchUsedAudioPaths(examDefId: number): Promise<string[]> 
   return [...new Set((data as { audio_path: string }[]).map((r) => r.audio_path))]
 }
 
+/** 已經上傳過的圖片路徑清單（題目配圖跟選項圖片共用同一個池子，同一個考試定義底下） */
+export async function fetchUsedImagePaths(examDefId: number): Promise<string[]> {
+  const [questionImages, optionImages] = await Promise.all([
+    supabase.from('question_bank').select('image_path').eq('exam_def_id', examDefId).not('image_path', 'is', null),
+    supabase
+      .from('question_bank')
+      .select('option_images_json')
+      .eq('exam_def_id', examDefId)
+      .not('option_images_json', 'is', null),
+  ])
+  if (questionImages.error) throw questionImages.error
+  if (optionImages.error) throw optionImages.error
+
+  const paths = new Set<string>()
+  for (const row of questionImages.data as { image_path: string }[]) paths.add(row.image_path)
+  for (const row of optionImages.data as { option_images_json: (string | null)[] }[]) {
+    for (const p of row.option_images_json ?? []) if (p) paths.add(p)
+  }
+  return [...paths]
+}
+
 const AUDIO_BUCKET = 'question-audio'
+const IMAGE_BUCKET = 'question-images'
 
 /** 上傳新音檔，回傳 Storage 路徑（不是網址——網址由學員端 take-exam Edge Function 簽發） */
 export async function uploadQuestionAudio(examDefId: number, file: File): Promise<string> {
@@ -119,9 +154,25 @@ export async function uploadQuestionAudio(examDefId: number, file: File): Promis
   return path
 }
 
+/** 上傳新圖片，回傳 Storage 路徑（題目配圖、選項圖片共用這支函式） */
+export async function uploadQuestionImage(examDefId: number, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${examDefId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(path, file)
+  if (error) throw error
+  return path
+}
+
 /** 後台預覽用的簽名網址（管理者角色對這個 bucket 有直接 select 權限，不需要經過 Edge Function） */
 export async function getAudioPreviewUrl(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from(AUDIO_BUCKET).createSignedUrl(path, 300)
+  if (error) throw error
+  return data.signedUrl
+}
+
+/** 後台預覽用的圖片簽名網址 */
+export async function getImagePreviewUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(IMAGE_BUCKET).createSignedUrl(path, 300)
   if (error) throw error
   return data.signedUrl
 }
@@ -137,6 +188,8 @@ export async function createQuestion(input: QuestionInput): Promise<void> {
     answer_json: input.answer,
     explanation: input.explanation || null,
     audio_path: input.audio_path || null,
+    image_path: input.image_path || null,
+    option_images_json: input.option_images ?? null,
   })
   if (error) throw error
 }
@@ -153,6 +206,8 @@ export async function updateQuestion(input: QuestionInput): Promise<void> {
       answer_json: input.answer,
       explanation: input.explanation || null,
       audio_path: input.audio_path || null,
+      image_path: input.image_path || null,
+      option_images_json: input.option_images ?? null,
     })
     .eq('id', input.id)
   if (error) throw error

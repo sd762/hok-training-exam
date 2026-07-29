@@ -28,6 +28,10 @@ export interface QuestionView {
   options: string[]
   /** 音訊題（聽力題）才有，限時簽名網址，每次開始/續答測驗都會重新簽發 */
   audio_url?: string | null
+  /** 題目配圖才有 */
+  image_url?: string | null
+  /** 跟 options 等長，選項本身是圖片時使用；沒配圖的選項該格是 null */
+  option_image_urls?: (string | null)[] | null
 }
 
 export interface StartResult {

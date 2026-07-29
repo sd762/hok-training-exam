@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Loader2, Plus, Upload, Volume2 } from 'lucide-react'
+import { Image, Loader2, Plus, Upload, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils'
@@ -176,6 +176,9 @@ export default function QuestionsPage() {
                     <div className="flex items-center gap-1.5">
                       {q.audio_path && (
                         <Volume2 className="size-4 shrink-0 text-brand-600" aria-label="音訊題" />
+                      )}
+                      {(q.image_path || q.option_images?.some(Boolean)) && (
+                        <Image className="size-4 shrink-0 text-brand-600" aria-label="圖片題" />
                       )}
                       <span className="truncate">{q.text}</span>
                     </div>
