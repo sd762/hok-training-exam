@@ -131,6 +131,64 @@ const dict = {
   },
 
   error_generic: { 'zh-TW': '發生錯誤，請稍後再試', vi: 'Đã xảy ra lỗi, vui lòng thử lại sau', id: 'Terjadi kesalahan, silakan coba lagi nanti' },
+
+  // 使用說明頁——學員看得到的段落（帳號登入、應考流程），見 src/pages/HelpPage.tsx
+  help_login_1: {
+    'zh-TW': '登入一律用「帳號代碼」（學員是工號），不是 email。',
+    vi: 'Đăng nhập luôn dùng "mã số nhân viên" (không phải email).',
+    id: 'Login selalu menggunakan "nomor pegawai" (bukan email).',
+  },
+  help_login_2: {
+    'zh-TW': '忘記密碼要請管理者重設，會恢復成預設密碼 000000。目前系統沒有自己修改密碼的功能。',
+    vi: 'Quên mật khẩu thì nhờ quản trị viên đặt lại, mật khẩu sẽ về mặc định là 000000. Hiện tại hệ thống chưa có chức năng tự đổi mật khẩu.',
+    id: 'Jika lupa kata sandi, minta admin untuk mereset, kata sandi akan kembali ke default 000000. Saat ini sistem belum memiliki fitur untuk mengubah kata sandi sendiri.',
+  },
+  help_login_3: {
+    'zh-TW': '新建立的帳號預設密碼也是 000000。',
+    vi: 'Tài khoản mới tạo cũng có mật khẩu mặc định là 000000.',
+    id: 'Akun yang baru dibuat juga memiliki kata sandi default 000000.',
+  },
+  help_exam_1: {
+    'zh-TW': '登入後首頁會顯示「目前應考測驗」提醒（如果有應考義務）。',
+    vi: 'Sau khi đăng nhập, trang chủ sẽ hiển thị nhắc nhở "bài thi hiện tại" (nếu bạn có nghĩa vụ thi).',
+    id: 'Setelah login, beranda akan menampilkan pengingat "ujian saat ini" (jika Anda memiliki kewajiban ujian).',
+  },
+  help_exam_2: {
+    'zh-TW': '開考前會先看到鏡頭監考同意書，需要明確同意才能進入測驗畫面。',
+    vi: 'Trước khi thi, bạn sẽ thấy bản đồng ý giám sát bằng camera, cần đồng ý rõ ràng mới vào được màn hình thi.',
+    id: 'Sebelum ujian, Anda akan melihat persetujuan pengawasan kamera, harus menyetujui dengan jelas untuk masuk ke layar ujian.',
+  },
+  help_exam_3: {
+    'zh-TW':
+      '測驗全程鏡頭持續開啟：人臉消失超過3秒會警示，累積3次自動中止並計入一次失敗；切換視窗/離開頁面第1次警告，第2次直接中止並計入一次失敗。',
+    vi: 'Camera sẽ bật liên tục trong suốt bài thi: nếu khuôn mặt biến mất quá 3 giây sẽ có cảnh báo, tích lũy đủ 3 lần sẽ tự động hủy bài thi và tính là một lần trượt; chuyển cửa sổ/rời trang lần 1 sẽ cảnh báo, lần 2 sẽ hủy ngay và tính là một lần trượt.',
+    id: 'Kamera akan aktif terus selama ujian: jika wajah menghilang lebih dari 3 detik akan muncul peringatan, jika mencapai 3 kali akan otomatis membatalkan ujian dan dihitung sebagai satu kali gagal; beralih jendela/keluar halaman pertama kali akan diperingatkan, kedua kalinya langsung dibatalkan dan dihitung sebagai satu kali gagal.',
+  },
+  help_exam_4: {
+    'zh-TW': '依序作答25題，題型有單選/複選；有些題目會附音訊（可以無限重聽）或圖片。',
+    vi: 'Trả lời lần lượt 25 câu hỏi, có loại chọn một hoặc chọn nhiều; một số câu có kèm âm thanh (có thể nghe lại không giới hạn) hoặc hình ảnh.',
+    id: 'Menjawab 25 soal secara berurutan, ada tipe pilihan tunggal/ganda; beberapa soal disertai audio (dapat diputar ulang tanpa batas) atau gambar.',
+  },
+  help_exam_5: {
+    'zh-TW': '送出後立即看到分數與及格/不及格；不及格會顯示剩餘重考次數，同一輪3次都沒過要鎖定7天。',
+    vi: 'Sau khi nộp bài sẽ thấy ngay điểm số và đạt/không đạt; nếu không đạt sẽ hiển thị số lần thi lại còn, nếu cả 3 lần trong một vòng đều không đạt sẽ bị khóa 7 ngày.',
+    id: 'Setelah mengirim akan langsung melihat nilai dan lulus/tidak lulus; jika tidak lulus akan ditampilkan sisa kesempatan ujian, jika 3 kali dalam satu putaran tidak lulus akan terkunci selama 7 hari.',
+  },
+  help_exam_6: {
+    'zh-TW': '及格後狀態先變「待核對」，等管理者審查確認「已確認通過」才正式算及格。',
+    vi: 'Sau khi đạt, trạng thái sẽ chuyển thành "đang chờ xác nhận", phải đợi quản trị viên xét duyệt xác nhận "đã xác nhận đạt" mới chính thức tính là đạt.',
+    id: 'Setelah lulus, status akan berubah menjadi "menunggu verifikasi", harus menunggu admin meninjau dan mengonfirmasi "telah dikonfirmasi lulus" baru resmi dihitung lulus.',
+  },
+  help_exam_7: {
+    'zh-TW': '作答畫面語言依你的帳號國籍自動顯示，不用自己切換。',
+    vi: 'Ngôn ngữ màn hình làm bài sẽ tự động hiển thị theo quốc tịch trong tài khoản của bạn, không cần tự chuyển đổi.',
+    id: 'Bahasa layar ujian akan otomatis ditampilkan sesuai kewarganegaraan pada akun Anda, tidak perlu mengganti sendiri.',
+  },
+  help_exam_8: {
+    'zh-TW': '作答到一半重新整理或關閉瀏覽器，重新登入可以繼續同一次未完成的測驗。',
+    vi: 'Nếu làm bài đến giữa chừng mà tải lại trang hoặc đóng trình duyệt, đăng nhập lại có thể tiếp tục bài thi chưa hoàn thành đó.',
+    id: 'Jika sedang mengerjakan ujian lalu me-refresh halaman atau menutup browser, login kembali dapat melanjutkan ujian yang belum selesai tersebut.',
+  },
 } as const
 
 export type TranslationKey = keyof typeof dict

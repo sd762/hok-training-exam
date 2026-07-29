@@ -1,6 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { useAuth } from '@/auth/useAuth'
 import { AppShell } from '@/components/AppShell'
@@ -31,6 +31,18 @@ export default function App() {
 
 function AppRoutes() {
   const { profile, loading } = useAuth()
+  const navigate = useNavigate()
+  const lastProfileId = useRef<string | null>(null)
+
+  // HashRouter 的網址不會隨登入/登出自動重設。同一分頁換人登入時（不論從哪個角色
+  // 換到哪個角色），只要偵測到「登入者換人了」就強制導回首頁，不依賴登入/登出按鈕
+  // 各自去 navigate（那樣容易跟 profile 狀態更新的時機卡在一起，實測會失效）。
+  useEffect(() => {
+    if (profile && profile.id !== lastProfileId.current) {
+      navigate('/', { replace: true })
+    }
+    lastProfileId.current = profile?.id ?? null
+  }, [profile, navigate])
 
   if (loading) {
     return (

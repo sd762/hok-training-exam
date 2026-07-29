@@ -2,13 +2,19 @@ import type { ReactNode } from 'react'
 import { Card } from '@/components/ui/Card'
 import { useAuth } from '@/auth/useAuth'
 import { canViewReports, canWrite } from '@/lib/roles'
+import { useStudentLang } from '@/features/exam/useStudentLang'
 
 /**
  * 使用說明頁——依角色只顯示相關的段落，用原生 <details> 折疊，不用額外狀態管理。
  * 內容要跟著功能異動更新，不要讓這裡變成另一份過時的文件。
+ *
+ * 「帳號與登入」「學員應考流程」這兩段學員看得到、也讀得懂自己的母語，用
+ * useStudentLang() 依帳號國籍翻譯；其餘管理功能段落只有管理者角色看得到，
+ * 管理者一律用中文操作介面，維持跟其他管理頁面一致，不用另外翻譯。
  */
 export default function HelpPage() {
   const { profile } = useAuth()
+  const { t } = useStudentLang()
   if (!profile) return null
 
   const isStaff = profile.role === 'staff'
@@ -25,24 +31,20 @@ export default function HelpPage() {
 
       <Section title="帳號與登入" defaultOpen>
         <ul className="list-disc space-y-1 pl-5">
-          <li>登入一律用「帳號代碼」（學員是工號），不是 email。</li>
-          <li>
-            忘記密碼要請管理者在對應的管理頁面點「重設密碼」，會恢復成預設密碼
-            <code className="mx-1 rounded bg-surface-muted px-1.5 py-0.5">000000</code>
-            。目前系統沒有自己修改密碼的功能，重設後密碼就是這組，如果需要保密性更高的做法，之後可以再請開發加上「登入後自行改密碼」。
-          </li>
-          <li>新建立的帳號（不管是學員還是管理者），預設密碼也是 000000，建立成功時畫面會直接顯示一次。</li>
+          <li>{t('help_login_1')}</li>
+          <li>{t('help_login_2')}</li>
+          <li>{t('help_login_3')}</li>
         </ul>
       </Section>
 
       {isStaff && (
         <Section title="學員：如何應考" defaultOpen>
-          <StudentGuide />
+          <StudentGuide t={t} />
         </Section>
       )}
       {!isStaff && (
         <Section title="學員應考流程（供協助排除問題參考）">
-          <StudentGuide />
+          <StudentGuide t={t} />
         </Section>
       )}
 
@@ -133,19 +135,17 @@ export default function HelpPage() {
   )
 }
 
-function StudentGuide() {
+function StudentGuide({ t }: { t: ReturnType<typeof useStudentLang>['t'] }) {
   return (
     <ul className="list-disc space-y-1 pl-5">
-      <li>登入後首頁會顯示「目前應考測驗」提醒（如果有應考義務）。</li>
-      <li>開考前會先看到鏡頭監考同意書，需要明確同意才能進入測驗畫面。</li>
-      <li>
-        測驗全程鏡頭持續開啟：人臉在畫面中消失超過3秒會出現警示，累積3次自動中止並計入一次失敗；切換視窗、最小化、離開頁面第1次會警告，第2次直接中止並計入一次失敗。
-      </li>
-      <li>依序作答25題，題型有單選/複選；有些題目會附音訊（可以無限重聽）或圖片（題目配圖，或選項本身就是圖片）。</li>
-      <li>送出後立即看到分數與及格/不及格；不及格的話會顯示剩餘重考次數，同一輪3次都沒過要鎖定7天才能再考。</li>
-      <li>及格後狀態會先變成「待核對」，要等管理者審查確認「已確認通過」，才會正式算及格、才能進到下一個受訓階段。</li>
-      <li>作答畫面的語言（繁中/越南文/印尼文）是系統依你帳號設定的國籍自動顯示，不用自己切換。</li>
-      <li>作答到一半重新整理頁面或關閉瀏覽器，重新登入可以繼續同一次未完成的測驗。</li>
+      <li>{t('help_exam_1')}</li>
+      <li>{t('help_exam_2')}</li>
+      <li>{t('help_exam_3')}</li>
+      <li>{t('help_exam_4')}</li>
+      <li>{t('help_exam_5')}</li>
+      <li>{t('help_exam_6')}</li>
+      <li>{t('help_exam_7')}</li>
+      <li>{t('help_exam_8')}</li>
     </ul>
   )
 }

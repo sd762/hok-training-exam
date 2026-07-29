@@ -10,7 +10,9 @@ export function useStudentLang() {
   const [lang, setLang] = useState<LangCode>('zh-TW')
 
   useEffect(() => {
-    if (!profile) return
+    // 只有學員在 staff_detail 有語言別紀錄；其他角色沒有這張表的資料列，
+    // 硬查會因為 .single() 找不到剛好一筆而丟例外，直接跳過、維持預設繁中
+    if (!profile || profile.role !== 'staff') return
     let active = true
     fetchOwnLangCode(profile.id).then((code) => {
       if (active) setLang(code)
