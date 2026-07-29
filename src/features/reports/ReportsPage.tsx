@@ -7,12 +7,14 @@ import StaffSummaryTab from './StaffSummaryTab'
 import QuestionAccuracyTab from './QuestionAccuracyTab'
 import ExamResultsTab from './ExamResultsTab'
 import AgeDistributionTab from './AgeDistributionTab'
+import AttemptDistributionTab from './AttemptDistributionTab'
 import { fetchInstitutions, type Institution } from '@/features/institutions/api'
 
-type Tab = 'staff' | 'questions' | 'results' | 'demographics'
+type Tab = 'staff' | 'questions' | 'results' | 'demographics' | 'attempts'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'results', label: '考測結果分析' },
+  { key: 'attempts', label: '應考次數分析' },
   { key: 'staff', label: '學員分析' },
   { key: 'questions', label: '考題分析' },
   { key: 'demographics', label: '國籍與年齡分布' },
@@ -77,6 +79,7 @@ export default function ReportsPage() {
           {tab === 'staff' && <StaffSummaryTab institutions={institutions} />}
           {tab === 'questions' && <QuestionAccuracyTab />}
           {tab === 'results' && <ExamResultsTab institutions={institutions} />}
+          {tab === 'attempts' && <AttemptDistributionTab institutions={institutions} />}
           {tab === 'demographics' && <AgeDistributionTab institutions={institutions} />}
         </Card>
       )}

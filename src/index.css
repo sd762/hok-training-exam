@@ -23,9 +23,12 @@
 
   /* 狀態燈號（與品牌色互不共用） */
   --color-status-pass: #15803d; /* 及格／已確認通過 */
-  --color-status-fail: #dc2626; /* 不及格 */
+  --color-status-fail: #dc2626; /* 不及格／測驗未達標 */
   --color-status-pending: #b45309; /* 待核對 */
   --color-status-flagged: #7c3aed; /* 存疑保留 */
+  /* 考試紀律違規（監考機制自動中止）——刻意跟上面的「測驗未達標」紅分開，
+     深色調傳達比一般不及格更嚴重的語意，但仍在「負面結果」的色相家族內 */
+  --color-status-violation: #450a0a;
 
   /* 介面中性色 */
   --color-surface: #ffffff;

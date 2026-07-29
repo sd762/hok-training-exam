@@ -41,6 +41,7 @@ export interface ExamResultRow {
   institution_name: string | null
   stage_code: string
   lang_code: string
+  /** confirmed_passed / failed_score（測驗未達標）/ failed_violation（考試紀律違規）/ pending_review / flagged / voided */
   status: string
   /** 這個狀態底下有幾「人」（同一人補考多次只算一次，取最終結果） */
   staff_count: number
@@ -65,6 +66,26 @@ export interface ExamResultFilters {
 
 export async function fetchExamResults(filters: ExamResultFilters): Promise<ExamResultRow[]> {
   const { data, error } = await supabase.rpc('report_exam_results', {
+    p_institution_id: filters.institutionId ?? null,
+    p_year: filters.year ?? null,
+    p_half: filters.half ?? null,
+    p_quarter: filters.quarter ?? null,
+    p_stage_code: filters.stageCode ?? null,
+    p_lang_code: filters.langCode ?? null,
+  })
+  if (error) throw error
+  return data
+}
+
+export interface AttemptDistributionRow {
+  attempt_bucket: string
+  /** confirmed_passed / failed_score / failed_violation / pending_review / flagged / voided */
+  status: string
+  staff_count: number
+}
+
+export async function fetchAttemptDistribution(filters: ExamResultFilters): Promise<AttemptDistributionRow[]> {
+  const { data, error } = await supabase.rpc('report_attempt_distribution', {
     p_institution_id: filters.institutionId ?? null,
     p_year: filters.year ?? null,
     p_half: filters.half ?? null,
