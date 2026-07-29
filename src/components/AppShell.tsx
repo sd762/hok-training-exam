@@ -1,5 +1,5 @@
 import { GraduationCap, LogOut } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/useAuth'
 import { ROLE_LABELS, canViewReports, canWrite, type UserRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
@@ -24,9 +24,16 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
   if (!profile) return null
 
   const items = NAV_ITEMS.filter((item) => item.visibleTo(profile.role))
+
+  async function handleSignOut() {
+    await signOut()
+    // 同一台裝置換下一個人登入前，先把網址重設回首頁（見 LoginPage 的同一則註解）
+    navigate('/', { replace: true })
+  }
 
   return (
     <div className="min-h-screen">
@@ -59,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {profile.display_name}（{ROLE_LABELS[profile.role]}）
             </span>
             <button
-              onClick={signOut}
+              onClick={handleSignOut}
               className="flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-sm transition-colors hover:bg-brand-800"
             >
               <LogOut className="size-4" aria-hidden />

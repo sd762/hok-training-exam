@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { GraduationCap, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/useAuth'
 
 export default function LoginPage() {
   const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [accountCode, setAccountCode] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -15,6 +17,10 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await signIn(accountCode, password)
+      // HashRouter 的網址不會因為登入/登出自動重設，同一分頁換人登入時
+      // 可能還停在上一位使用者最後停留的頁面（例如都能進的「使用說明」），
+      // 登入成功一律導回首頁，確保每次登入畫面一致
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗')
     } finally {
