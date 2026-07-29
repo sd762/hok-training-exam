@@ -25,11 +25,11 @@ export default function HelpPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">使用說明</h1>
-        <p className="mt-1 text-sm text-ink-muted">依你目前的角色只顯示相關的段落。</p>
+        <h1 className="text-xl font-semibold">{t('help_page_title')}</h1>
+        <p className="mt-1 text-sm text-ink-muted">{t('help_page_subtitle')}</p>
       </div>
 
-      <Section title="帳號與登入" defaultOpen>
+      <Section title={t('help_section_login_title')} defaultOpen>
         <ul className="list-disc space-y-1 pl-5">
           <li>{t('help_login_1')}</li>
           <li>{t('help_login_2')}</li>
@@ -38,7 +38,7 @@ export default function HelpPage() {
       </Section>
 
       {isStaff && (
-        <Section title="學員：如何應考" defaultOpen>
+        <Section title={t('help_section_exam_title')} defaultOpen>
           <StudentGuide t={t} />
         </Section>
       )}

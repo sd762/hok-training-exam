@@ -133,6 +133,18 @@ const dict = {
   error_generic: { 'zh-TW': '發生錯誤，請稍後再試', vi: 'Đã xảy ra lỗi, vui lòng thử lại sau', id: 'Terjadi kesalahan, silakan coba lagi nanti' },
 
   // 使用說明頁——學員看得到的段落（帳號登入、應考流程），見 src/pages/HelpPage.tsx
+  help_page_title: { 'zh-TW': '使用說明', vi: 'Hướng dẫn sử dụng', id: 'Panduan Penggunaan' },
+  help_page_subtitle: {
+    'zh-TW': '依你目前的角色只顯示相關的段落。',
+    vi: 'Chỉ hiển thị các phần liên quan đến vai trò hiện tại của bạn.',
+    id: 'Hanya menampilkan bagian yang terkait dengan peran Anda saat ini.',
+  },
+  help_section_login_title: { 'zh-TW': '帳號與登入', vi: 'Tài khoản và đăng nhập', id: 'Akun dan Login' },
+  help_section_exam_title: {
+    'zh-TW': '學員：如何應考',
+    vi: 'Học viên: Cách tham gia thi',
+    id: 'Peserta: Cara Mengikuti Ujian',
+  },
   help_login_1: {
     'zh-TW': '登入一律用「帳號代碼」（學員是工號），不是 email。',
     vi: 'Đăng nhập luôn dùng "mã số nhân viên" (không phải email).',

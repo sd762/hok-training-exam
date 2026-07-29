@@ -34,12 +34,15 @@ function AppRoutes() {
   const navigate = useNavigate()
   const lastProfileId = useRef<string | null>(null)
 
-  // HashRouter 的網址不會隨登入/登出自動重設。同一分頁換人登入時（不論從哪個角色
-  // 換到哪個角色），只要偵測到「登入者換人了」就強制導回首頁，不依賴登入/登出按鈕
-  // 各自去 navigate（那樣容易跟 profile 狀態更新的時機卡在一起，實測會失效）。
+  // HashRouter 的網址不會隨登入/登出自動重設。不管是「登入者換人」還是「登出」，
+  // 只要偵測到 profile 有這兩種轉變，就把網址強制重設回首頁——登出當下就處理，
+  // 不要只靠下次登入時再導頁，避免網址列停在登出前那一頁造成混淆。
   useEffect(() => {
+    const wasLoggedIn = lastProfileId.current !== null
     if (profile && profile.id !== lastProfileId.current) {
-      navigate('/', { replace: true })
+      navigate('/', { replace: true }) // 登入、或換了另一個人登入
+    } else if (!profile && wasLoggedIn) {
+      navigate('/', { replace: true }) // 登出
     }
     lastProfileId.current = profile?.id ?? null
   }, [profile, navigate])
