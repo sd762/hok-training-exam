@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/institutions', label: '機構管理', visibleTo: canWrite },
   { to: '/admins', label: '管理者帳號', visibleTo: canWrite },
   { to: '/notifications', label: '通知設定', visibleTo: canWrite },
+  { to: '/help', label: '使用說明', visibleTo: () => true },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {

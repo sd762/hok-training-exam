@@ -7,6 +7,7 @@ import { AppShell } from '@/components/AppShell'
 import { canViewReports, canWrite } from '@/lib/roles'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
+import HelpPage from '@/pages/HelpPage'
 import InstitutionsPage from '@/features/institutions/InstitutionsPage'
 import StaffPage from '@/features/staff/StaffPage'
 import QuestionsPage from '@/features/questions/QuestionsPage'
@@ -49,6 +50,7 @@ function AppRoutes() {
     <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/help" element={<HelpPage />} />
         {canReport && <Route path="/reports" element={<ReportsPage />} />}
         {writable && <Route path="/review" element={<ReviewPage />} />}
         {writable && <Route path="/notifications" element={<NotificationsPage />} />}
