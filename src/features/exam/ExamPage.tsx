@@ -47,11 +47,26 @@ export default function ExamPage() {
     handleAborted('tab_switch'),
   )
 
+  async function getCameraStream(): Promise<MediaStream> {
+    try {
+      // 手機優先抓前鏡頭
+      return await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === 'NotFoundError' || err.name === 'OverconstrainedError')) {
+        // 很多筆電內建鏡頭不會回報 facingMode（前/後鏡頭是手機才有的概念），
+        // 嚴格指定 facingMode:'user' 在這類裝置上反而會找不到符合條件的裝置，
+        // 退回完全不限制方向，抓到能用的鏡頭就好
+        return await navigator.mediaDevices.getUserMedia({ video: true })
+      }
+      throw err
+    }
+  }
+
   async function handleConsent() {
     setError(null)
     setConsentSubmitting(true)
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      const mediaStream = await getCameraStream()
       const data = await startExam()
       setStream(mediaStream)
       setSession(data)
@@ -60,7 +75,16 @@ export default function ExamPage() {
     } catch (err) {
       if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
         setError(t('camera_denied'))
+      } else if (err instanceof DOMException && (err.name === 'NotFoundError' || err.name === 'OverconstrainedError')) {
+        // 這台裝置沒有攝影機，或找不到符合限制的鏡頭——瀏覽器原生訊息是英文
+        // （例如 "Requested device not found"），一定要翻成看得懂的訊息，不能直接漏出來
+        setError(t('camera_not_found'))
+      } else if (err instanceof DOMException) {
+        // 其他鏡頭相關的瀏覽器例外，同樣不漏出英文原文
+        setError(t('error_generic'))
       } else {
+        // 不是鏡頭例外，通常是 startExam() 回傳的業務邏輯錯誤（例如題庫不足、已鎖定），
+        // 這種訊息本來就是我們自己寫的中文訊息，維持照樣顯示
         setError(err instanceof Error ? err.message : t('error_generic'))
       }
     } finally {

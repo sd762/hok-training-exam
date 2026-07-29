@@ -108,6 +108,11 @@ const dict = {
     vi: 'Không thể truy cập camera, vui lòng cho phép trình duyệt sử dụng camera rồi thử lại',
     id: 'Tidak dapat mengakses kamera, mohon izinkan browser menggunakan kamera lalu coba lagi',
   },
+  camera_not_found: {
+    'zh-TW': '找不到攝影機裝置，請確認這台裝置有連接鏡頭（電腦鏡頭或手機前鏡頭）後再試一次',
+    vi: 'Không tìm thấy thiết bị camera, vui lòng kiểm tra thiết bị này có kết nối camera (camera máy tính hoặc camera trước điện thoại) rồi thử lại',
+    id: 'Perangkat kamera tidak ditemukan, mohon pastikan perangkat ini terhubung dengan kamera (kamera komputer atau kamera depan ponsel) lalu coba lagi',
+  },
   face_missing_warning: {
     'zh-TW': '偵測不到您的臉，請正對鏡頭',
     vi: 'Không phát hiện khuôn mặt của bạn, vui lòng nhìn thẳng vào camera',
