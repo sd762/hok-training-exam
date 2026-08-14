@@ -32,6 +32,32 @@ export interface StaffRow {
   hire_date: string
   current_stage: TrainingStage | null
   department: string | null
+  exam_status: StaffExamStatus
+}
+
+export type StaffExamState =
+  | 'inactive'
+  | 'all_completed'
+  | 'no_exam'
+  | 'not_due_yet'
+  | 'ready'
+  | 'in_progress'
+  | 'pending_review'
+  | 'flagged'
+  | 'locked'
+
+export interface StaffExamStatus {
+  staff_id: string
+  stage_code: TrainingStage | null
+  exam_title: string | null
+  state: StaffExamState
+  due_date: string | null
+  locked_until: string | null
+  attempts_left: number | null
+  latest_status: 'in_progress' | 'failed' | 'pending_review' | 'confirmed_passed' | 'flagged' | 'voided' | null
+  latest_score: number | null
+  latest_submitted_at: string | null
+  latest_failed_by_violation: boolean
 }
 
 export interface StaffFormInput {
@@ -47,17 +73,24 @@ export interface StaffFormInput {
 }
 
 export async function fetchStaff(): Promise<StaffRow[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(
-      `id, account_code, display_name, is_active, institution_id,
-       institution:institution_id ( name ),
-       staff_detail ( name_native, lang_code, birth_date, hire_date, current_stage, department )`,
-    )
-    .eq('role', 'staff')
-    .order('account_code')
+  const [profilesResult, examStatusResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        `id, account_code, display_name, is_active, institution_id,
+         institution:institution_id ( name ),
+         staff_detail ( name_native, lang_code, birth_date, hire_date, current_stage, department )`,
+      )
+      .eq('role', 'staff')
+      .order('account_code'),
+    callAdminUsers<{ statuses: StaffExamStatus[] }>({ action: 'get_exam_statuses' }),
+  ])
+
+  const { data, error } = profilesResult
 
   if (error) throw error
+
+  const statuses = new Map(examStatusResult.statuses.map((status) => [status.staff_id, status]))
 
   return (data as unknown as RawStaffRow[]).map((row) => ({
     id: row.id,
@@ -72,7 +105,24 @@ export async function fetchStaff(): Promise<StaffRow[]> {
     hire_date: row.staff_detail?.hire_date ?? '',
     current_stage: row.staff_detail?.current_stage ?? null,
     department: row.staff_detail?.department ?? null,
+    exam_status: statuses.get(row.id) ?? emptyExamStatus(row.id, row.is_active),
   }))
+}
+
+function emptyExamStatus(staffId: string, isActive: boolean): StaffExamStatus {
+  return {
+    staff_id: staffId,
+    stage_code: null,
+    exam_title: null,
+    state: isActive ? 'no_exam' : 'inactive',
+    due_date: null,
+    locked_until: null,
+    attempts_left: null,
+    latest_status: null,
+    latest_score: null,
+    latest_submitted_at: null,
+    latest_failed_by_violation: false,
+  }
 }
 
 interface RawStaffRow {
@@ -125,6 +175,12 @@ export async function deleteStaff(accountCode: string): Promise<void> {
 
 export async function resetStaffPassword(accountCode: string): Promise<{ new_password: string }> {
   return callAdminUsers({ action: 'reset_password', account_code: accountCode })
+}
+
+export async function releaseStaffExamLockout(
+  staffId: string,
+): Promise<{ exam_title: string; prior_locked_until: string; attempts_left: number }> {
+  return callAdminUsers({ action: 'release_exam_lockout', staff_id: staffId })
 }
 
 export interface BulkImportRow extends StaffFormInput {}

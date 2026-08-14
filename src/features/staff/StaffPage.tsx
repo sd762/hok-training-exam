@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Loader2, Plus, Search, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, Loader2, LockOpen, Plus, Search, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -10,10 +10,12 @@ import {
   deleteStaff,
   fetchStaff,
   LANG_LABELS,
+  releaseStaffExamLockout,
   resetStaffPassword,
   setStaffActive,
   STAGE_LABELS,
   type StaffRow,
+  type StaffExamStatus,
 } from './api'
 import { StaffFormModal } from './StaffFormModal'
 
@@ -33,6 +35,7 @@ export default function StaffPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [openInstitutions, setOpenInstitutions] = useState<Set<number | 'none'>>(new Set())
   const [search, setSearch] = useState('')
+  const [unlockingStaffId, setUnlockingStaffId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setError(null)
@@ -129,6 +132,34 @@ export default function StaffPage() {
     }
   }
 
+  async function handleReleaseLockout(row: StaffRow) {
+    const lockedUntil = row.exam_status.locked_until
+      ? formatDateTime(row.exam_status.locked_until)
+      : '原管制期限'
+    if (
+      !confirm(
+        `確定要提前解除「${row.display_name}」（${row.account_code}）的考試管制嗎？\n\n` +
+          `目前管制至：${lockedUntil}\n` +
+          '解除後會立即開放新一輪 3 次測考機會；原有失敗、分數及違規紀錄都會保留。',
+      )
+    ) return
+
+    setError(null)
+    setNotice(null)
+    setUnlockingStaffId(row.id)
+    try {
+      const result = await releaseStaffExamLockout(row.id)
+      setNotice(
+        `${row.display_name}（${row.account_code}）的考試管制已解除，可立即重新測考（本輪 ${result.attempts_left} 次機會）。`,
+      )
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '解除考試管制失敗')
+    } finally {
+      setUnlockingStaffId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-ink-muted">
@@ -146,7 +177,7 @@ export default function StaffPage() {
         <div>
           <h1 className="text-xl font-semibold">學員管理</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            在職學員只能停用不能刪除；已停用者可以刪除。點機構名稱展開/收合底下的學員名單。
+            可查看每位學員目前考測狀況；連續 3 次未通過的 7 日管制可在此提前解除。原考測與違規紀錄仍會保留。
           </p>
         </div>
         <div className="flex gap-2">
@@ -207,6 +238,8 @@ export default function StaffPage() {
                     onResetPassword={handleResetPassword}
                     onToggleActive={handleToggleActive}
                     onDelete={handleDelete}
+                    onReleaseLockout={handleReleaseLockout}
+                    unlockingStaffId={unlockingStaffId}
                   />
                 ))}
               </div>
@@ -226,6 +259,8 @@ export default function StaffPage() {
               onResetPassword={handleResetPassword}
               onToggleActive={handleToggleActive}
               onDelete={handleDelete}
+              onReleaseLockout={handleReleaseLockout}
+              unlockingStaffId={unlockingStaffId}
             />
           </div>
         )}
@@ -270,6 +305,8 @@ function InstitutionFolder({
   onResetPassword,
   onToggleActive,
   onDelete,
+  onReleaseLockout,
+  unlockingStaffId,
 }: {
   title: string
   rows: StaffRow[]
@@ -279,6 +316,8 @@ function InstitutionFolder({
   onResetPassword: (row: StaffRow) => void
   onToggleActive: (row: StaffRow) => void
   onDelete: (row: StaffRow) => void
+  onReleaseLockout: (row: StaffRow) => void
+  unlockingStaffId: string | null
 }) {
   return (
     <Card className="overflow-hidden p-0">
@@ -308,6 +347,7 @@ function InstitutionFolder({
                 </th>
                 <th className="px-4 py-2 font-medium">到職日</th>
                 <th className="px-4 py-2 font-medium">已合格階段</th>
+                <th className="min-w-52 px-4 py-2 font-medium">考測狀況</th>
                 <th className="px-4 py-2 font-medium">狀態</th>
                 <th className="px-4 py-2 font-medium">操作</th>
               </tr>
@@ -315,7 +355,7 @@ function InstitutionFolder({
             <tbody className="divide-y divide-line">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-ink-muted">
+                  <td colSpan={9} className="px-4 py-6 text-center text-ink-muted">
                     這個機構還沒有學員
                   </td>
                 </tr>
@@ -333,6 +373,9 @@ function InstitutionFolder({
                     {row.current_stage ? STAGE_LABELS[row.current_stage] : '尚未設定'}
                   </td>
                   <td className="px-4 py-2">
+                    <ExamStatusCell status={row.exam_status} />
+                  </td>
+                  <td className="px-4 py-2">
                     {row.is_active ? <span className="text-status-pass">在職</span> : <span>已停用</span>}
                   </td>
                   <td className="px-4 py-2">
@@ -346,6 +389,22 @@ function InstitutionFolder({
                       <Button size="sm" variant="ghost" onClick={() => onToggleActive(row)}>
                         {row.is_active ? '停用' : '啟用'}
                       </Button>
+                      {row.exam_status.state === 'locked' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={unlockingStaffId === row.id}
+                          onClick={() => onReleaseLockout(row)}
+                          title="提前解除 7 日管制；原失敗與違規紀錄仍會保留"
+                        >
+                          {unlockingStaffId === row.id ? (
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                          ) : (
+                            <LockOpen className="size-4" aria-hidden />
+                          )}
+                          解除考試管制
+                        </Button>
+                      )}
                       {!row.is_active && (
                         <Button size="sm" variant="ghost" onClick={() => onDelete(row)}>
                           刪除
@@ -361,4 +420,76 @@ function InstitutionFolder({
       )}
     </Card>
   )
+}
+
+function ExamStatusCell({ status }: { status: StaffExamStatus }) {
+  const stage = status.stage_code ? STAGE_LABELS[status.stage_code] : null
+  let label: string
+  let labelClass = 'text-ink-muted'
+
+  switch (status.state) {
+    case 'inactive':
+      label = '帳號已停用'
+      break
+    case 'all_completed':
+      label = '全部階段已完成'
+      labelClass = 'text-status-pass'
+      break
+    case 'no_exam':
+      label = stage ? `${stage}尚無有效測驗` : '受訓資料不完整'
+      break
+    case 'not_due_yet':
+      label = `尚未到期（${status.due_date ?? '日期未定'}）`
+      break
+    case 'in_progress':
+      label = '作答中'
+      labelClass = 'text-brand-700'
+      break
+    case 'pending_review':
+      label = '已通過，待管理者核對'
+      labelClass = 'text-status-warning'
+      break
+    case 'flagged':
+      label = '存疑，待處理'
+      labelClass = 'text-status-violation'
+      break
+    case 'locked':
+      label = `考試管制至 ${formatDateTime(status.locked_until)}`
+      labelClass = 'font-semibold text-status-fail'
+      break
+    case 'ready':
+      label = status.latest_status === 'failed' ? '上次未通過，可重考' : '可開始測考'
+      labelClass = status.latest_status === 'failed' ? 'text-status-warning' : 'text-status-pass'
+      break
+  }
+
+  return (
+    <div className="space-y-0.5">
+      {stage && <div className="text-xs text-ink-muted">目前應考：{stage}</div>}
+      <div className={labelClass}>{label}</div>
+      {(status.state === 'ready' || status.state === 'in_progress') && status.attempts_left !== null && (
+        <div className="text-xs text-ink-muted">本輪剩餘 {status.attempts_left} 次機會</div>
+      )}
+      {status.latest_status === 'failed' && status.state !== 'locked' && (
+        <div className="text-xs text-ink-muted">
+          最近結果：{status.latest_failed_by_violation ? '違規中止' : '未達及格分數'}
+          {status.latest_score !== null ? `（${status.latest_score} 分）` : ''}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
 }

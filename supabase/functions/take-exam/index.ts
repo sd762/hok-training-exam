@@ -168,13 +168,29 @@ function addMonths(date: Date, months: number): Date {
 // 重考次數/鎖定狀態（同一輪最多 3 次，3 次都沒過鎖 7 天）
 // ---------------------------------------------------------------------------
 async function getCycleStatus(admin: ReturnType<typeof createClient>, staffId: string, examDefId: number) {
-  const { data: recent } = await admin
+  // 管理者若曾提前解除管制，新一輪考試機會只計算解除時間後的失敗紀錄。
+  // 解除紀錄本身保留 released_by / prior_locked_until，舊 attempt 不刪除也不改狀態。
+  const { data: latestRelease } = await admin
+    .from('exam_lockout_release')
+    .select('released_at')
+    .eq('staff_id', staffId)
+    .eq('exam_def_id', examDefId)
+    .order('released_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let recentQuery = admin
     .from('attempt')
     .select('status, submitted_at')
     .eq('staff_id', staffId)
     .eq('exam_def_id', examDefId)
     .not('submitted_at', 'is', null)
-    .order('submitted_at', { ascending: false })
+
+  if (latestRelease?.released_at) {
+    recentQuery = recentQuery.gt('submitted_at', latestRelease.released_at)
+  }
+
+  const { data: recent } = await recentQuery.order('submitted_at', { ascending: false })
 
   let consecutiveFails = 0
   let lastFailTime: string | null = null
